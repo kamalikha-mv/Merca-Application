@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Mecra | Emergency Response Assistant</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f1f5fb;
+    color: #17243a;
+}
+
+header {
+    background: #142541;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 32px;
+}
+
+header p {
+    margin-bottom: 0;
+    color: #d8e4f5;
+}
+
+main {
+    max-width: 750px;
+    margin: auto;
+    padding: 20px;
+}
+
+.card {
+    background: white;
+    padding: 22px;
+    margin-bottom: 20px;
+    border-radius: 18px;
+    box-shadow: 0 4px 15px #0000000d;
+}
+
+h2 {
+    margin-top: 0;
+}
+
+.description {
+    color: #627087;
+    line-height: 1.6;
+}
+
+.help-button {
+    display: block;
+    margin: 25px auto;
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    border: 8px solid #e2eaff;
+    background: #2864e8;
+    color: white;
+    font-size: 25px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.help-button:hover {
+    background: #174bc2;
+}
+
+.scenarios {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.scenario {
+    background: #f5f8ff;
+    border: 2px solid #dce5f4;
+    padding: 15px;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.scenario.selected {
+    background: #e7efff;
+    border-color: #2864e8;
+}
+
+.scenario strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.scenario span {
+    font-size: 13px;
+    color: #627087;
+}
+
+button {
+    font-family: inherit;
+}
+
+.action-button {
+    width: 100%;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 12px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    background: #2864e8;
+    color: white;
+}
+
+.secondary-button {
+    background: #e8eef9;
+    color: #17243a;
+}
+
+.response-box {
+    margin-top: 18px;
+    padding: 16px;
+    background: #f7f9fd;
+    border: 1px solid #dce5f4;
+    border-radius: 12px;
+    min-height: 100px;
+}
+
+.message {
+    background: white;
+    padding: 12px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    line-height: 1.5;
+    border: 1px solid #e1e7f0;
+}
+
+.user-message {
+    background: #e5efff;
+}
+
+.status {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 20px;
+    background: #dff8ec;
+    color: #176344;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.step {
+    padding: 12px 0;
+    border-bottom: 1px solid #e5eaf2;
+    line-height: 1.5;
+}
+
+.step:last-child {
+    border-bottom: none;
+}
+
+.step small {
+    display: block;
+    color: #627087;
+    margin-top: 4px;
+}
+
+.setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #e5eaf2;
+}
+
+.setting button {
+    padding: 9px 12px;
+    border: none;
+    border-radius: 8px;
+    background: #e8eef9;
+    cursor: pointer;
+}
+
+.notice {
+    padding: 13px;
+    background: #fff1d6;
+    color: #76520f;
+    border-radius: 10px;
+    line-height: 1.5;
+    font-size: 13px;
+    margin-top: 15px;
+}
+
+footer {
+    text-align: center;
+    padding: 20px;
+    color: #627087;
+    font-size: 12px;
+}
+
+@media (max-width: 480px) {
+    .scenarios {
+        grid-template-columns: 1fr;
+    }
+
+    main {
+        padding: 12px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>◉ Mecra</h1>
+    <p>When you can't think, Mecra helps with the next step.</p>
+</header>
+
+<main>
+
+    <!-- SECTION 1: ACTIVATE MECra -->
+
+    <section class="card">
+        <h2>Emergency Assistant</h2>
+
+        <p class="description">
+            Choose what you need. Mecra will demonstrate how it could
+            guide you through the next steps.
+        </p>
+
+        <button class="help-button" onclick="activateMecra()">
+            HELP
+        </button>
+
+        <p style="text-align:center;color:#627087">
+            Tap to activate the demonstration
+        </p>
+    </section>
+
+
+    <!-- SECTION 2: CHOOSE A SITUATION -->
+
+    <section class="card">
+
+        <h2>What do you need help with?</h2>
+
+        <div class="scenarios">
+
+            <button class="scenario selected"
+                    onclick="selectScenario('unsafe', this)">
+                <strong>🛡️ I feel unsafe</strong>
+                <span>Help me find the next step.</span>
+            </button>
+
+            <button class="scenario"
+                    onclick="selectScenario('talk', this)">
+                <strong>💬 I need someone</strong>
+                <span>Help me contact a trusted person.</span>
+            </button>
+
+            <button class="scenario"
+                    onclick="selectScenario('lost', this)">
+                <strong>📍 I'm lost</strong>
+                <span>Help me decide what to do.</span>
+            </button>
+
+            <button class="scenario"
+                    onclick="selectScenario('vehicle', this)">
+                <strong>🚗 Vehicle trouble</strong>
+                <span>Help me request assistance.</span>
+            </button>
+
+        </div>
+
+        <button class="action-button" onclick="activateMecra()">
+            Activate Mecra
+        </button>
+
+    </section>
+
+
+    <!-- SECTION 3: MECra RESPONSE -->
+
+    <section class="card">
+
+        <h2>Mecra Response</h2>
+
+        <span class="status" id="status">
+            STANDBY
+        </span>
+
+        <div class="response-box" id="response">
+
+            <div class="message">
+                Mecra: I'm here. Choose a situation and activate me.
+            </div>
+
+        </div>
+
+        <button class="action-button secondary-button"
+                onclick="confirmSafe()">
+            I'm safe
+        </button>
+
+        <button class="action-button secondary-button"
+                onclick="stillNeedHelp()">
+            I still need help
+        </button>
+
+    </section>
+
+
+    <!-- SECTION 4: RESPONSE TIMELINE -->
+
+    <section class="card">
+
+        <h2>Response Timeline</h2>
+
+        <p class="description">
+            Watch the steps Mecra follows in this simulation.
+        </p>
+
+        <div id="timeline">
+
+            <div class="step">
+                <strong>1. Activate</strong>
+                <small>Choose a situation and activate Mecra.</small>
+            </div>
+
+        </div>
+
+        <button class="action-button"
+                onclick="simulateNoAnswer()">
+            Simulate No Response
+        </button>
+
+        <button class="action-button secondary-button"
+                onclick="resetMecra()">
+            Reset Demonstration
+        </button>
+
+    </section>
+
+
+    <!-- SECTION 5: GUARDIAN MODE -->
+
+    <section class="card">
+
+        <h2>🛡️ Guardian Mode</h2>
+
+        <p class="description">
+            Demonstrate a journey check-in with a trusted contact.
+            This prototype does not track your real location.
+        </p>
+
+        <div class="setting">
+            <div>
+                <strong>Guardian Mode</strong>
+                <div class="description">
+                    Enable the simulated journey flow.
+                </div>
+            </div>
+
+            <button onclick="toggleGuardian()"
+                    id="guardianButton">
+                Turn On
+            </button>
+        </div>
+
+        <label for="destination">Destination</label>
+
+        <input id="destination"
+               value="Home"
+               style="width:100%;padding:12px;margin:10px 0;
+               border:1px solid #dce5f4;border-radius:8px">
+
+        <button class="action-button"
+                onclick="startJourney()">
+            Start Journey
+        </button>
+
+        <button class="action-button secondary-button"
+                onclick="journeyCheckIn()">
+            Test Check-In
+        </button>
+
+        <div class="response-box" id="guardianResponse">
+            Guardian Mode is off.
+        </div>
+
+    </section>
+
+
+    <!-- SAFETY NOTICE -->
+
+    <section class="card">
+
+        <h2>About This Prototype</h2>
+
+        <p class="description">
+            This is an interactive software demonstration. It does not
+            make calls, send messages, access GPS, listen to your
+            microphone, or contact emergency services.
+        </p>
+
+        <div class="notice">
+            Never rely on this prototype during a real emergency.
+            Real emergency features require secure implementation,
+            permissions, testing, and appropriate service integrations.
+        </div>
+
+    </section>
+
+</main>
+
+<footer>
+    Mecra Interactive Prototype · Version 1
+</footer>
+
+
+<script>
+
+/* =====================================
+   MECra PROTOTYPE: JAVASCRIPT
+   ===================================== */
+
+let selectedScenario = "unsafe";
+let isActive = false;
+let guardianEnabled = false;
+
+
+/* SCENARIO DATA */
+
+const scenarios = {
+
+    unsafe: {
+        userMessage: "I feel unsafe. I need help.",
+
+        mecraMessage:
+            "I'm here with you. If it is safe, move toward a public, staffed place or a trusted person. Would you like to start your saved help plan?",
+
+        steps: [
+            ["Understand",
+             "The user selected an urgent safety scenario."],
+
+            ["Guide",
+             "Offer one calm, practical next step."],
+
+            ["Contact Priority 1",
+             "Simulate contacting the first trusted person."],
+
+            ["Follow Up",
+             "Wait for an acknowledgement."]
+        ]
+    },
+
+
+    talk: {
+        userMessage: "I need someone to talk to.",
+
+        mecraMessage:
+            "You don't have to explain everything at once. I can demonstrate contacting your preferred support person.",
+
+        steps: [
+            ["Understand",
+             "The user wants to connect with someone."],
+
+            ["Offer a Choice",
+             "Use the saved contact order or choose a person."],
+
+            ["Contact Preferred Person",
+             "Simulate a contact request."],
+
+            ["Fallback",
+             "Try another configured contact if enabled."]
+        ]
+    },
+
+
+    lost: {
+        userMessage: "I'm lost and need guidance.",
+
+        mecraMessage:
+            "Let's take this one step at a time. If safe, stay somewhere public and visible and ask an appropriate staff member for help.",
+
+        steps: [
+            ["Understand",
+             "The user reports being lost."],
+
+            ["Give Guidance",
+             "Suggest a visible public place and appropriate help."],
+
+            ["Location Sharing",
+             "Demonstrate the concept. No real location is accessed."],
+
+            ["Contact Trusted Person",
+             "Simulate preparing a help message."]
+        ]
+    },
+
+
+    vehicle: {
+        userMessage: "My vehicle has broken down.",
+
+        mecraMessage:
+            "First, focus on staying safe. If possible, move away from moving traffic. I can demonstrate requesting roadside assistance.",
+
+        steps: [
+            ["Understand",
+             "The user selected vehicle trouble."],
+
+            ["Safety First",
+             "Suggest a safe position away from traffic if possible."],
+
+            ["Request Assistance",
+             "Simulate a roadside assistance request."],
+
+            ["Follow Up",
+             "Demonstrate checking whether the request is acknowledged."]
+        ]
+    }
+
+};
+
+
+/* CHOOSE A SCENARIO */
+
+function selectScenario(name, button) {
+
+    selectedScenario = name;
+
+    document.querySelectorAll(".scenario")
+        .forEach(function(item) {
+            item.classList.remove("selected");
+        });
+
+    button.classList.add("selected");
+
+    isActive = false;
+
+    document.getElementById("status").textContent = "STANDBY";
+
+    document.getElementById("response").innerHTML =
+        '<div class="message">Mecra: You selected a situation. Activate Mecra to begin.</div>';
+
+    document.getElementById("timeline").innerHTML =
+        '<div class="step"><strong>Ready</strong><small>Activate Mecra to begin the simulation.</small></div>';
+}
+
+
+/* ACTIVATE MECra */
+
+function activateMecra() {
+
+    isActive = true;
+
+    const scenario = scenarios[selectedScenario];
+
+    document.getElementById("status").textContent =
+        "ACTIVE · DEMO";
+
+    document.getElementById("response").innerHTML =
+
+        '<div class="message user-message"><strong>You:</strong> ' +
+        scenario.userMessage +
+        '</div>' +
+
+        '<div class="message"><strong>Mecra:</strong> ' +
+        scenario.mecraMessage +
+        '</div>';
+
+    showTimeline(scenario.steps);
+}
+
+
+/* DISPLAY THE RESPONSE TIMELINE */
+
+function showTimeline(steps) {
+
+    let output = "";
+
+    steps.forEach(function(step, index) {
+
+        output +=
+            '<div class="step">' +
+            '<strong>' + (index + 1) + '. ' + step[0] + '</strong>' +
+            '<small>' + step[1] + '</small>' +
+            '</div>';
+
+    });
+
+    document.getElementById("timeline").innerHTML = output;
+}
+
+
+/* USER CONFIRMS THEY ARE SAFE */
+
+function confirmSafe() {
+
+    if (!isActive) {
+        alert("Activate Mecra first.");
+        return;
+    }
+
+    document.getElementById("status").textContent =
+        "USER SAFE";
+
+    document.getElementById("response").innerHTML +=
+
+        '<div class="message user-message">' +
+        '<strong>You:</strong> I am safe now.' +
+        '</div>' +
+
+        '<div class="message">' +
+        '<strong>Mecra:</strong> Thanks for confirming. ' +
+        'This demonstration has recorded your check-in.' +
+        '</div>';
+
+    document.getElementById("timeline").innerHTML =
+
+        '<div class="step"><strong>1. Check-In Received</strong>' +
+        '<small>The user confirms they are safe.</small></div>' +
+
+        '<div class="step"><strong>2. Update Alert</strong>' +
+        '<small>Simulate updating previously notified contacts.</small></div>' +
+
+        '<div class="step"><strong>3. Close or Monitor</strong>' +
+        '<small>Follow the user’s configured preference.</small></div>';
+}
+
+
+/* USER STILL NEEDS HELP */
+
+function stillNeedHelp() {
+
+    if (!isActive) {
+        alert("Activate Mecra first.");
+        return;
+    }
+
+    document.getElementById("status").textContent =
+        "HELP CONTINUING";
+
+    document.getElementById("response").innerHTML +=
+
+        '<div class="message user-message">' +
+        '<strong>You:</strong> I still need help.' +
+        '</div>' +
+
+        '<div class="message">' +
+        '<strong>Mecra:</strong> Understood. ' +
+        'I will continue the simulated help plan.' +
+        '</div>';
+
+    document.getElementById("timeline").innerHTML =
+
+        '<div class="step"><strong>1. Need Confirmed</strong>' +
+        '<small>The user confirms that help is still needed.</small></div>' +
+
+        '<div class="step"><strong>2. Try Next Contact</strong>' +
+        '<small>Simulate contacting the next configured person.</small></div>' +
+
+        '<div class="step"><strong>3. Check Acknowledgement</strong>' +
+        '<small>Wait for a response.</small></div>' +
+
+        '<div class="step"><strong>4. Follow Fallback Plan</strong>' +
+        '<small>Demonstrate the configured escalation process.</small></div>';
+}
+
+
+/* SIMULATE CONTACT NOT ANSWERING */
+
+function simulateNoAnswer() {
+
+    if (!isActive) {
+        alert("Activate Mecra first.");
+        return;
+    }
+
+    document.getElementById("status").textContent =
+        "FALLBACK DEMO";
+
+    document.getElementById("response").innerHTML +=
+
+        '<div class="message">' +
+        '<strong>System:</strong> Priority 1 did not acknowledge.' +
+        '</div>' +
+
+        '<div class="message">' +
+        '<strong>Mecra:</strong> No acknowledgement yet. ' +
+        'I will demonstrate trying the next configured contact.' +
+        '</div>';
+
+    document.getElementById("timeline").innerHTML =
+
+        '<div class="step"><strong>1. Priority Contact 1</strong>' +
+        '<small>Simulated attempt. No acknowledgement.</small></div>' +
+
+        '<div class="step"><strong>2. Priority Contact 2</strong>' +
+        '<small>Simulated fallback attempt.</small></div>' +
+
+        '<div class="step"><strong>3. Priority Contact 3</strong>' +
+        '<small>Only if the user enabled this option.</small></div>' +
+
+        '<div class="step"><strong>4. Further Assistance</strong>' +
+        '<small>A real implementation would need verified integrations and appropriate permissions.</small></div>';
+}
+
+
+/* RESET THE DEMONSTRATION */
+
+function resetMecra() {
+
+    isActive = false;
+
+    document.getElementById("status").textContent =
+        "STANDBY";
+
+    document.getElementById("response").innerHTML =
+        '<div class="message">Mecra: Demo reset. Activate me when ready.</div>';
+
+    document.getElementById("timeline").innerHTML =
+        '<div class="step"><strong>1. Activate</strong><small>Choose a situation and start again.</small></div>';
+}
+
+
+/* GUARDIAN MODE */
+
+function toggleGuardian() {
+
+    guardianEnabled = !guardianEnabled;
+
+    document.getElementById("guardianButton").textContent =
+        guardianEnabled ? "Turn Off" : "Turn On";
+
+    document.getElementById("guardianResponse").textContent =
+        guardianEnabled
+        ? "Guardian Mode is enabled for this demonstration."
+        : "Guardian Mode is off.";
+}
+
+
+/* START A SIMULATED JOURNEY */
+
+function startJourney() {
+
+    if (!guardianEnabled) {
+        alert("Turn on Guardian Mode first.");
+        return;
+    }
+
+    const destination =
+        document.getElementById("destination").value || "your destination";
+
+    document.getElementById("guardianResponse").innerHTML =
+
+        '<div class="message"><strong>Mecra:</strong> ' +
+        'Your demo journey to ' + destination +
+        ' has started. No real location is being tracked.' +
+        '</div>';
+}
+
+
+/* SIMULATE A GUARDIAN CHECK-IN */
+
+function journeyCheckIn() {
+
+    if (!guardianEnabled) {
+        alert("Turn on Guardian Mode first.");
+        return;
+    }
+
+    document.getElementById("guardianResponse").innerHTML =
+
+        '<div class="message"><strong>Mecra:</strong> ' +
+        'Check-in time. Are you safe?' +
+        '</div>' +
+
+        '<button class="action-button secondary-button" ' +
+        'onclick="journeySafe()">I am safe</button>' +
+
+        '<button class="action-button secondary-button" ' +
+        'onclick="journeyNoReply()">Simulate no reply</button>';
+}
+
+
+function journeySafe() {
+
+    document.getElementById("guardianResponse").innerHTML =
+
+        '<div class="message">' +
+        '<strong>Mecra:</strong> Check-in confirmed. ' +
+        'Your demo journey status has been updated.' +
+        '</div>';
+}
+
+
+function journeyNoReply() {
+
+    document.getElementById("guardianResponse").innerHTML =
+
+        '<div class="message">' +
+        '<strong>Mecra:</strong> No reply simulated. ' +
+        'A real app would follow the user’s configured check-in ' +
+        'and escalation rules instead of automatically assuming danger.' +
+        '</div>';
+}
+
+</script>
+
+</body>
+</html>
