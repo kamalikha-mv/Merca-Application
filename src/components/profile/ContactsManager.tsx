@@ -301,13 +301,37 @@ export const ContactsManager: React.FC = () => {
           </div>
 
           <div>
-            <label className="font-bold text-[#0f1d32] block mb-1">Allergies</label>
+            <label className="font-bold text-[#0f1d32] block mb-1">Severe Health Risks / Chronic Conditions</label>
             <input
               type="text"
-              value={medData.allergies}
-              onChange={(e) => setMedData({ ...medData, allergies: e.target.value })}
+              value={medData.severeHealthRisks || ''}
+              onChange={(e) => setMedData({ ...medData, severeHealthRisks: e.target.value })}
+              placeholder="e.g. Acute bronchial asthma during panic / dust exposure"
               className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-bold text-[#0f1d32] block mb-1">Allergies</label>
+              <input
+                type="text"
+                value={medData.allergies}
+                onChange={(e) => setMedData({ ...medData, allergies: e.target.value })}
+                className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
+              />
+            </div>
+
+            <div>
+              <label className="font-bold text-[#0f1d32] block mb-1">City / Town</label>
+              <input
+                type="text"
+                value={medData.cityTown || ''}
+                onChange={(e) => setMedData({ ...medData, cityTown: e.target.value })}
+                placeholder="Kilambakkam, Chennai"
+                className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
+              />
+            </div>
           </div>
 
           <div>

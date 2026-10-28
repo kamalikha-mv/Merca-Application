@@ -1,21 +1,30 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { MapPin, RefreshCw, HeartPulse, AlertTriangle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { MapPin, RefreshCw, HeartPulse, AlertTriangle, ShieldAlert, Map, Wrench, Compass, UserCheck } from 'lucide-react';
+import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 
 export const MobileHeader: React.FC = () => {
   const { location, isLoadingLocation, refreshLocation, emergencyStatus } = useApp();
   const navigate = useNavigate();
+  const currentPath = useLocation().pathname;
 
   const isEmergencyActive = emergencyStatus === 'DISPATCHED';
 
+  const navLinks = [
+    { to: '/', label: 'Emergency', icon: ShieldAlert },
+    { to: '/map', label: 'Live Map', icon: Map },
+    { to: '/breakdown', label: 'Breakdown', icon: Wrench },
+    { to: '/guardian', label: 'Guardian', icon: Compass },
+    { to: '/profile', label: 'Safety & ID', icon: UserCheck },
+  ];
+
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#e5ebf3] px-4 py-2.5 transition-colors">
-      <div className="flex items-center justify-between gap-2 max-w-md mx-auto">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#e5ebf3] transition-colors w-full shadow-xs">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3">
         {/* LOGO */}
         <div
           onClick={() => navigate('/')}
-          className="flex items-center gap-2 cursor-pointer group"
+          className="flex items-center gap-2 cursor-pointer group shrink-0"
         >
           <div className="w-8 h-8 rounded-xl bg-[#e84e5f] text-white flex items-center justify-center font-black text-base shadow-xs group-hover:scale-105 transition-transform">
             M
@@ -26,50 +35,83 @@ export const MobileHeader: React.FC = () => {
                 MECRA
               </span>
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-50 text-[#e84e5f]">
-                APP
+                OFFICIAL
               </span>
             </div>
-            <p className="text-[10px] text-[#5b6b82] -mt-0.5 font-medium">Emergency Response</p>
+            <p className="text-[10px] text-[#5b6b82] -mt-0.5 font-medium">Emergency Response Assistant</p>
           </div>
         </div>
 
-        {/* GPS LOCATION PILL */}
-        <div
-          onClick={() => refreshLocation()}
-          title="Click to refresh GPS"
-          className="flex-1 max-w-[170px] bg-[#f8fafd] hover:bg-slate-100 border border-[#e5ebf3] rounded-full px-2.5 py-1 flex items-center gap-1.5 cursor-pointer transition-all"
-        >
-          <MapPin
-            className={`w-3.5 h-3.5 shrink-0 ${
-              location.isLive ? 'text-emerald-600' : 'text-blue-600'
-            }`}
-          />
-          <span className="text-[11px] font-semibold text-[#0f1d32] truncate">
-            {location.address.split(',')[0]}
-          </span>
-          <RefreshCw
-            className={`w-3 h-3 text-slate-400 shrink-0 ml-auto ${
-              isLoadingLocation ? 'animate-spin text-blue-600' : ''
-            }`}
-          />
-        </div>
+        {/* DESKTOP NAVIGATION LINKS */}
+        <nav className="hidden md:flex items-center gap-1 bg-[#f1f5fb] p-1 rounded-2xl border border-[#e5ebf3]">
+          {navLinks.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentPath === item.to;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-white text-[#0f1d32] shadow-xs'
+                    : 'text-[#5b6b82] hover:text-[#0f1d32] hover:bg-white/50'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#e84e5f]' : 'text-slate-400'}`} />
+                <span>{item.label}</span>
+                {item.to === '/' && isEmergencyActive && (
+                  <span className="w-2 h-2 rounded-full bg-[#e84e5f] animate-ping" />
+                )}
+              </NavLink>
+            );
+          })}
+        </nav>
 
-        {/* MEDICAL ID / EMERGENCY SHORTCUT */}
-        <button
-          onClick={() => navigate('/profile')}
-          title="Emergency Medical Profile"
-          className={`w-8 h-8 rounded-full border flex items-center justify-center cursor-pointer transition-transform active:scale-90 ${
-            isEmergencyActive
-              ? 'bg-rose-50 border-rose-200 text-[#e84e5f] animate-pulse'
-              : 'bg-[#f8fafd] border-[#e5ebf3] text-slate-700 hover:text-rose-600'
-          }`}
-        >
-          {isEmergencyActive ? (
-            <AlertTriangle className="w-4 h-4 text-[#e84e5f]" />
-          ) : (
-            <HeartPulse className="w-4 h-4" />
-          )}
-        </button>
+        {/* RIGHT ACTIONS: GPS LOCATION PILL & MEDICAL SHORTCUT */}
+        <div className="flex items-center gap-2">
+          {/* GPS LOCATION PILL */}
+          <div
+            onClick={() => refreshLocation()}
+            title="Click to refresh real-time GPS"
+            className="bg-[#f8fafd] hover:bg-[#f1f5fb] border border-[#e5ebf3] rounded-full px-3 py-1.5 flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+          >
+            <MapPin
+              className={`w-3.5 h-3.5 shrink-0 ${
+                location.isLive ? 'text-emerald-600' : 'text-blue-600'
+              }`}
+            />
+            <div className="flex flex-col text-left max-w-[110px] sm:max-w-[180px]">
+              <span className="text-[11px] font-bold text-[#0f1d32] truncate leading-tight">
+                {location.town || location.address.split(',')[0]}
+              </span>
+              <span className="text-[9px] text-[#627087] truncate leading-none">
+                {location.countryCode || '+91'} • {location.city || 'Chennai Region'}
+              </span>
+            </div>
+            <RefreshCw
+              className={`w-3 h-3 text-slate-400 shrink-0 ml-1 ${
+                isLoadingLocation ? 'animate-spin text-[#e84e5f]' : ''
+              }`}
+            />
+          </div>
+
+          {/* MEDICAL ID / EMERGENCY SHORTCUT */}
+          <button
+            onClick={() => navigate('/profile')}
+            title="Emergency Medical Profile & ICE Card"
+            className={`w-9 h-9 rounded-xl border flex items-center justify-center cursor-pointer transition-all active:scale-95 shadow-xs ${
+              isEmergencyActive
+                ? 'bg-rose-50 border-rose-300 text-[#e84e5f] animate-pulse'
+                : 'bg-white border-[#e5ebf3] text-slate-700 hover:text-[#e84e5f] hover:border-rose-200'
+            }`}
+          >
+            {isEmergencyActive ? (
+              <AlertTriangle className="w-4 h-4 text-[#e84e5f]" />
+            ) : (
+              <HeartPulse className="w-4 h-4 text-[#e84e5f]" />
+            )}
+          </button>
+        </div>
       </div>
     </header>
   );

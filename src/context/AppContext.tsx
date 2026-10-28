@@ -51,17 +51,23 @@ interface AppContextType {
 
   // UI Toast
   toastMessage: string | null;
-  showToast: (msg: string) => void;
+  toastType: 'info' | 'success' | 'error';
+  showToast: (msg: string, type?: 'info' | 'success' | 'error') => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Location State
+  // Location State (Default: Kilambakkam / Chennai Region, India)
   const [location, setLocation] = useState<LocationData>({
-    lat: 12.9716,
-    lng: 77.5946,
-    address: 'Civic Plaza, Central Metro District',
+    lat: 12.8718,
+    lng: 80.0815,
+    address: 'Kilambakkam, Guduvancheri, Chennai Metropolitan Region, Tamil Nadu',
+    town: 'Kilambakkam',
+    city: 'Chengalpattu / Chennai',
+    state: 'Tamil Nadu',
+    country: 'India',
+    countryCode: '+91',
     accuracy: 10,
     timestamp: Date.now(),
     isLive: false,
@@ -89,12 +95,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'info' | 'success' | 'error'>('info');
 
-  const showToast = useCallback((msg: string) => {
+  const showToast = useCallback((msg: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToastMessage(msg);
+    setToastType(type);
     setTimeout(() => {
       setToastMessage((prev) => (prev === msg ? null : prev));
-    }, 4000);
+    }, 4500);
   }, []);
 
   // Fetch Location on initial load
@@ -105,11 +113,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLocation(loc);
       showToast(
         loc.isLive
-          ? `📍 Live GPS locked: ${loc.address.substring(0, 32)}...`
-          : '📍 Standard GPS simulation locked'
+          ? `📍 Live GPS locked: ${loc.town || loc.address.substring(0, 24)} (±${loc.accuracy}m)`
+          : `📍 Regional GPS locked: ${loc.town || 'Kilambakkam, Chennai'}`,
+        'success'
       );
     } catch {
-      showToast('⚠️ Could not fetch GPS, using simulated location.');
+      showToast('⚠️ Could not fetch live GPS, calibrated to safe regional coordinates.', 'info');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -119,15 +128,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshLocation();
   }, [refreshLocation]);
 
+  // Voice Guidance Announcement
+  const speakGuidance = (text: string) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   // Handle Emergency Trigger
   const triggerEmergency = useCallback(
     (category: EmergencyCategory, customSituation?: string) => {
       const policeStations = localDb.getServices('police');
       const nearestPolice = policeStations[0] || {
-        id: 'pol-1',
-        name: 'Metropolitan Central Police Station',
-        phone: '100 / (555) 911-0100',
-        address: '42 Civic Center Blvd',
+        id: 'pol-local-1',
+        name: `${location.town || 'Kilambakkam'} Police Station & Highway Unit`,
+        phone: '112 / 100 / 044-27452222',
+        address: 'GST Road Junction, Near KCBT Terminal',
       };
       setDispatchedPoliceStation(nearestPolice as NearbyService);
 
@@ -152,7 +172,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setEscalationStep(1);
       localDb.saveAlertRecord(newAlert);
 
-      showToast(`🚨 ALERT DISPATCHED: Logged to ${nearestPolice.name}`);
+      showToast(`🚨 ALERT DISPATCHED: Logged to ${nearestPolice.name} & ICE circle`, 'error');
+
+      // Calibrated Voice Guidance
+      let voiceMessage = 'Emergency alert activated. Help is on the way. Your live GPS coordinates are being shared.';
+      if (category === 'threat' || category === 'assault') {
+        voiceMessage = 'Threat alert active. Stay in a well-lit area. Women safety helpline 1091 and police 112 have been alerted with your coordinates.';
+      } else if (category === 'medical') {
+        voiceMessage = 'Medical emergency registered. Ambulance helpline 108 activated. Stay calm, check breathing, patient medical card is ready.';
+      } else if (category === 'vehicle') {
+        voiceMessage = 'Vehicle breakdown alert active. National Highway patrol 1033 and mobile recovery units dispatched.';
+      }
+      speakGuidance(voiceMessage);
 
       // Sound and Vibration feedback
       if ('vibrate' in navigator) {
@@ -166,7 +197,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const confirmEmergencyDispatch = useCallback(() => {
     if (activeAlert) {
       setEmergencyStatus('DISPATCHED');
-      showToast('✅ Priority dispatch confirmed. Monitoring response window.');
+      showToast('✅ Priority dispatch confirmed. Monitoring response window.', 'success');
     }
   }, [activeAlert, showToast]);
 
@@ -185,7 +216,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setEmergencyStatus('CANCELLED');
       setActiveAlert(null);
       setEscalationStep(1);
-      showToast('ℹ️ Emergency alert cancelled by user.');
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      showToast('ℹ️ Emergency alert cancelled by user.', 'info');
     },
     [activeAlert, showToast]
   );
@@ -204,7 +238,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setEmergencyStatus('RESOLVED_SAFE');
     setActiveAlert(null);
     setEscalationStep(1);
-    showToast('✅ Confirmed SAFE: Alerts resolved, contacts notified.');
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    showToast('✅ Confirmed SAFE: Alerts resolved, emergency contacts notified.', 'success');
   }, [activeAlert, showToast]);
 
   // Escalation Simulation Loop (When emergency is active)
@@ -214,10 +251,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const timer = setInterval(() => {
       setEscalationStep((prev) => {
         if (prev === 1) {
-          showToast('⏳ Priority 1 unanswered. Escalating to Priority 2 (David Chen)...');
+          const c2 = contacts[1]?.name || 'Secondary Family Contact';
+          showToast(`⏳ Priority 1 unanswered. Escalating to Priority 2 (${c2})...`, 'info');
           return 2;
         } else if (prev === 2) {
-          showToast('⚠️ Escalating to Priority 3 Safety Circle (Elena Rostova)...');
+          const c3 = contacts[2]?.name || 'Safety Circle Backup';
+          showToast(`⚠️ Escalating to Priority 3 (${c3})...`, 'error');
           return 3;
         }
         return prev;
@@ -225,25 +264,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 18000); // 18 seconds simulated escalation window
 
     return () => clearInterval(timer);
-  }, [emergencyStatus, showToast]);
+  }, [emergencyStatus, contacts, showToast]);
 
   // Contact CRUD
   const addContact = (contact: Omit<TrustedContact, 'id'>) => {
     const created = localDb.addContact(contact);
     setContacts(localDb.getContacts());
-    showToast(`Added contact: ${created.name}`);
+    showToast(`Added contact: ${created.name}`, 'success');
   };
 
   const updateContact = (id: string, updates: Partial<TrustedContact>) => {
     localDb.updateContact(id, updates);
     setContacts(localDb.getContacts());
-    showToast('Contact updated successfully');
+    showToast('Contact updated successfully', 'success');
   };
 
   const deleteContact = (id: string) => {
     localDb.deleteContact(id);
     setContacts(localDb.getContacts());
-    showToast('Contact removed');
+    showToast('Contact removed', 'info');
   };
 
   // Medical Updates
@@ -251,7 +290,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = { ...medical, ...updates };
     setMedical(updated);
     localDb.saveMedical(updated);
-    showToast('Medical Emergency ID updated');
+    showToast('Medical Emergency ID updated', 'success');
   };
 
   // Breakdown wrapper
@@ -291,6 +330,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveJourney,
         dispatchedPoliceStation,
         toastMessage,
+        toastType,
         showToast,
       }}
     >

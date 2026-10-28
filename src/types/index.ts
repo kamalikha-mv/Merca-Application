@@ -1,10 +1,10 @@
 export type EmergencyCategory =
   | 'unsafe'
+  | 'threat'
   | 'medical'
-  | 'assault'
   | 'vehicle'
+  | 'assault'
   | 'fire'
-  | 'disaster'
   | 'lost'
   | 'general';
 
@@ -20,6 +20,11 @@ export interface LocationData {
   lat: number;
   lng: number;
   address: string;
+  town?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  countryCode?: string; // e.g. '+91'
   accuracy: number;
   timestamp: number;
   isLive: boolean;
@@ -66,7 +71,7 @@ export interface NearbyService {
   verifiedDate: string;
 }
 
-export type VehicleType = 'Car' | 'Motorcycle' | 'Truck' | 'Scooter' | 'Van';
+export type VehicleType = 'Car' | 'Motorcycle' | 'Truck' | 'Scooter' | 'Auto';
 
 export type BreakdownProblem =
   | 'flat_tyre'
@@ -103,10 +108,13 @@ export interface GuardianJourney {
   status: 'ACTIVE' | 'CHECKED_IN' | 'ANOMALY_PROMPT' | 'COMPLETED_SAFE' | 'MISSED_ALERT';
   checkInIntervalMinutes: number;
   lastCheckInAt: number;
+  routeSafetyScore: number; // e.g. 92%
+  currentSpeedKmH: number;
+  isVehicleHalted: boolean;
   timeline: {
     time: string;
     event: string;
-    type: 'start' | 'checkin' | 'alert' | 'complete';
+    type: 'start' | 'checkin' | 'alert' | 'complete' | 'speed';
   }[];
 }
 
@@ -128,10 +136,37 @@ export interface MedicalProfile {
   bloodType: string;
   allergies: string;
   medications: string;
+  severeHealthRisks: string;
   emergencyNotes: string;
   organDonor: boolean;
+  cityTown: string;
   primaryLanguage: string;
   allowEmergencyAccess: boolean;
+}
+
+export interface VideoEvidenceRecord {
+  id: string;
+  recordedAt: number;
+  durationSeconds: number;
+  fileBlobUrl: string;
+  locationAddress: string;
+  coordinates: { lat: number; lng: number };
+  sizeMb: number;
+  incidentType: string;
+}
+
+export interface IncidentPatientCardData {
+  incidentId: string;
+  timestamp: string;
+  fullName: string;
+  bloodGroup: string;
+  allergies: string;
+  healthRisks: string;
+  currentMedications: string;
+  incidentAddress: string;
+  coordinates: string;
+  emergencyType: string;
+  contacts: { name: string; relation: string; phone: string; priority: number }[];
 }
 
 export interface AgentChatMessage {
@@ -143,7 +178,7 @@ export interface AgentChatMessage {
   executedTool?: {
     name: string;
     result: string;
-    actionType?: 'call' | 'dispatch' | 'map' | 'share';
+    actionType?: 'call' | 'dispatch' | 'map' | 'share' | 'record' | 'card';
   };
 }
 
