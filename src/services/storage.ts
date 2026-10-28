@@ -25,48 +25,20 @@ const STORAGE_KEYS = {
   INCIDENT_CARDS: 'merca_incident_cards_v1',
 };
 
-// Default Trusted Contacts (Indian Region)
-export const DEFAULT_CONTACTS: TrustedContact[] = [
-  {
-    id: 'contact-1',
-    name: 'Priya Sharma',
-    relation: 'Partner / Spouse',
-    phone: '+91 98401 23456',
-    priority: 1,
-    customTemplate: 'EMERGENCY: I need urgent help! My current live location is attached.',
-    simulatedStatus: 'ACKNOWLEDGED',
-  },
-  {
-    id: 'contact-2',
-    name: 'Karthik Raman',
-    relation: 'Brother / Family',
-    phone: '+91 98402 34567',
-    priority: 2,
-    customTemplate: 'Notice: Mecra alert triggered. Please check in with me.',
-    simulatedStatus: 'DELIVERED',
-  },
-  {
-    id: 'contact-3',
-    name: 'Deepak Kumar',
-    relation: 'Close Friend / Roommate',
-    phone: '+91 98403 45678',
-    priority: 3,
-    customTemplate: 'Safety Circle ping: Mecra escalated my emergency status.',
-    simulatedStatus: 'PENDING',
-  },
-];
+// Default Trusted Contacts (starts empty - user must configure their own real contacts)
+export const DEFAULT_CONTACTS: TrustedContact[] = [];
 
-// Default Medical Profile (Indian Region)
+// Default Medical Profile (starts empty with no fake preloaded personal details)
 export const DEFAULT_MEDICAL: MedicalProfile = {
-  fullName: 'Rahul Krishnan',
-  bloodType: 'O+',
-  allergies: 'Penicillin, Peanuts',
-  medications: 'Asthma Inhaler (Albuterol) as needed',
-  severeHealthRisks: 'Acute bronchial asthma during panic / dust exposure',
-  emergencyNotes: 'Carry inhaler in front pocket. Primary contact: Priya (+91 98401 23456).',
-  organDonor: true,
-  cityTown: 'Kilambakkam, Chennai',
-  primaryLanguage: 'Tamil, English',
+  fullName: '',
+  bloodType: '',
+  allergies: '',
+  medications: '',
+  severeHealthRisks: '',
+  emergencyNotes: '',
+  organDonor: false,
+  cityTown: '',
+  primaryLanguage: '',
   allowEmergencyAccess: true,
 };
 
@@ -147,7 +119,11 @@ export const localDb = {
   getContacts: (): TrustedContact[] => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.CONTACTS);
-      return data ? JSON.parse(data) : DEFAULT_CONTACTS;
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return DEFAULT_CONTACTS;
     } catch {
       return DEFAULT_CONTACTS;
     }

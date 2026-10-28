@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Sparkles,
   Phone,
+  AlertCircle,
 } from 'lucide-react';
 
 interface OnboardingWizardModalProps {
@@ -27,16 +28,33 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   const { location, refreshLocation, showToast } = useApp();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
 
-  // Step 2: Contacts
-  const [contacts, setContacts] = useState<TrustedContact[]>(() => localDb.getContacts());
+  // Step 2: Empty Form Rows - User enters their own real contacts (Min 2 required)
+  const [contacts, setContacts] = useState<TrustedContact[]>(() => {
+    const existing = localDb.getContacts();
+    if (existing.length >= 2) return existing;
+    return [
+      { id: 'contact-1', name: '', relation: '', phone: '', priority: 1, customTemplate: 'EMERGENCY: Urgent assistance needed.' },
+      { id: 'contact-2', name: '', relation: '', phone: '', priority: 2, customTemplate: 'Notice: Mecra alert escalated.' },
+      { id: 'contact-3', name: '', relation: '', phone: '', priority: 3, customTemplate: 'Safety Circle ping.' },
+    ];
+  });
 
-  // Step 3: Medical ID
+  // Step 3: Medical ID - Empty defaults with clean placeholders
   const [medical, setMedical] = useState<MedicalProfile>(() => {
     const med = localDb.getMedical();
     return {
-      ...med,
-      cityTown: med.cityTown || (location.town ? `${location.town}, ${location.city}` : 'Kilambakkam, Chennai'),
+      fullName: med.fullName || '',
+      bloodType: med.bloodType || '',
+      allergies: med.allergies || '',
+      medications: med.medications || '',
+      severeHealthRisks: med.severeHealthRisks || '',
+      emergencyNotes: med.emergencyNotes || '',
+      organDonor: med.organDonor || false,
+      cityTown: med.cityTown || (location.town ? `${location.town}, ${location.city}` : ''),
+      primaryLanguage: med.primaryLanguage || '',
+      allowEmergencyAccess: true,
     };
   });
 
@@ -58,10 +76,23 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
     const updated = [...contacts];
     updated[index] = { ...updated[index], [field]: value };
     setContacts(updated);
+    setContactError(null);
   };
 
+  // Validation: at least 2 filled contacts
+  const validContacts = contacts.filter(
+    (c) => c.name.trim().length > 0 && c.phone.trim().length >= 8
+  );
+
   const handleStep2Next = () => {
-    localDb.saveContacts(contacts);
+    if (validContacts.length < 2) {
+      setContactError(
+        'Please enter at least 2 emergency contacts (Name & Phone Number) so Mecra can escalate if the first is unreachable.'
+      );
+      return;
+    }
+
+    localDb.saveContacts(validContacts);
     setStep(3);
   };
 
@@ -119,9 +150,9 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
             {step === 1 &&
               'Grant emergency permissions to auto-detect your location and configure regional emergency dispatch lines.'}
             {step === 2 &&
-              'Configure your Priority Emergency Contacts (pre-calibrated for regional mobile routing).'}
+              'Configure your Emergency Contacts (minimum 2 required for backup escalation). No preloaded data.'}
             {step === 3 &&
-              'Set up your Emergency Medical ID card so first responders can treat you without delay.'}
+              'Set up your Emergency Medical ID card so first responders and ambulance staff have your vital details.'}
           </p>
         </div>
 
@@ -140,7 +171,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                       Location & Notification Permission
                     </h4>
                     <p className="text-xs text-slate-600 mt-0.5">
-                      Used exclusively on-device during crisis events to dispatch live GPS coordinates to verified emergency services.
+                      Used strictly on your device during crisis situations to dispatch verified GPS coordinates to emergency responders.
                     </p>
                   </div>
                 </div>
@@ -220,17 +251,33 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
             </div>
           )}
 
-          {/* STEP 2: EMERGENCY CONTACTS SETUP */}
+          {/* STEP 2: EMERGENCY CONTACTS SETUP (NO PRE-LOADED FAKE DATA) */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Priority Contacts (Priority 1, 2, 3)
-                </span>
-                <span className="text-xs text-slate-500">
-                  Pre-filled with Indian format ({location.countryCode || '+91'})
+                <div>
+                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                    Priority Contacts (Min 2 Required, Up to 3)
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Enter your real emergency circle. No hardcoded or dummy values.
+                  </span>
+                </div>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                  validContacts.length >= 2
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                }`}>
+                  {validContacts.length}/2 Added
                 </span>
               </div>
+
+              {contactError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-[#e84e5f] shrink-0" />
+                  <span>{contactError}</span>
+                </div>
+              )}
 
               {contacts.map((contact, idx) => (
                 <div
@@ -243,11 +290,11 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                         {idx + 1}
                       </span>
                       <span className="text-xs font-bold text-[#0f1d32]">
-                        Priority {idx + 1} Contact
+                        Priority {idx + 1} Contact {idx < 2 && <span className="text-[#e84e5f]">*</span>}
                       </span>
                     </div>
                     <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-600 font-medium">
-                      {idx === 0 ? 'Primary Responder' : idx === 1 ? 'Secondary Family' : 'Backup Circle'}
+                      {idx === 0 ? 'Primary Responder' : idx === 1 ? 'Secondary Family' : 'Backup Circle (Optional)'}
                     </span>
                   </div>
 
@@ -258,8 +305,8 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                         type="text"
                         value={contact.name}
                         onChange={(e) => handleContactChange(idx, 'name', e.target.value)}
-                        className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
-                        placeholder="Contact name"
+                        className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
+                        placeholder="Enter Name"
                       />
                     </div>
                     <div>
@@ -268,21 +315,19 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                         type="text"
                         value={contact.relation}
                         onChange={(e) => handleContactChange(idx, 'relation', e.target.value)}
-                        className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
-                        placeholder="e.g. Spouse / Brother"
+                        className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
+                        placeholder="Enter Relation (e.g. Spouse / Brother)"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-600 uppercase">Phone Number</label>
-                      <div className="relative">
-                        <input
-                          type="tel"
-                          value={contact.phone}
-                          onChange={(e) => handleContactChange(idx, 'phone', e.target.value)}
-                          className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
-                          placeholder="+91 98401 23456"
-                        />
-                      </div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase">Mobile Number</label>
+                      <input
+                        type="tel"
+                        value={contact.phone}
+                        onChange={(e) => handleContactChange(idx, 'phone', e.target.value)}
+                        className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
+                        placeholder="Enter Mobile Number (+91 ...)"
+                      />
                     </div>
                   </div>
                 </div>
@@ -290,13 +335,13 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
             </div>
           )}
 
-          {/* STEP 3: MEDICAL ID CARD SETUP */}
+          {/* STEP 3: MEDICAL ID CARD SETUP (CLEAN PLACEHOLDERS) */}
           {step === 3 && (
             <div className="space-y-3.5">
               <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 flex items-center gap-3">
                 <HeartPulse className="w-5 h-5 text-[#e84e5f] shrink-0" />
                 <p className="text-xs text-rose-950 font-medium">
-                  This card will be instantly accessible by emergency paramedics and hospital casualty officers during a 108 dispatch.
+                  This card will be accessible by emergency paramedics and hospital casualty doctors during a 108 dispatch.
                 </p>
               </div>
 
@@ -308,7 +353,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                     value={medical.fullName}
                     onChange={(e) => setMedical({ ...medical, fullName: e.target.value })}
                     className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
-                    placeholder="e.g. Rahul Krishnan"
+                    placeholder="Enter Full Legal Name"
                   />
                 </div>
 
@@ -319,6 +364,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                     onChange={(e) => setMedical({ ...medical, bloodType: e.target.value })}
                     className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
                   >
+                    <option value="">-- Select Blood Group --</option>
                     {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((bg) => (
                       <option key={bg} value={bg}>
                         {bg}
@@ -336,7 +382,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                     value={medical.allergies}
                     onChange={(e) => setMedical({ ...medical, allergies: e.target.value })}
                     className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
-                    placeholder="e.g. Penicillin, Peanuts (or None)"
+                    placeholder="Enter Allergies (or type 'None')"
                   />
                 </div>
 
@@ -349,7 +395,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                     value={medical.severeHealthRisks}
                     onChange={(e) => setMedical({ ...medical, severeHealthRisks: e.target.value })}
                     className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
-                    placeholder="e.g. Acute bronchial asthma during panic / dust exposure"
+                    placeholder="Enter Chronic Risks (e.g. Asthma, Cardiac, Diabetes, or 'None')"
                   />
                 </div>
 
@@ -360,7 +406,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                     value={medical.medications}
                     onChange={(e) => setMedical({ ...medical, medications: e.target.value })}
                     className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
-                    placeholder="e.g. Inhaler (Albuterol)"
+                    placeholder="Enter Current Medications (or 'None')"
                   />
                 </div>
 
@@ -371,7 +417,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                     value={medical.cityTown}
                     onChange={(e) => setMedical({ ...medical, cityTown: e.target.value })}
                     className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
-                    placeholder="e.g. Kilambakkam, Chennai"
+                    placeholder="Enter City / Town"
                   />
                 </div>
               </div>
@@ -405,7 +451,11 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
           {step === 2 && (
             <button
               onClick={handleStep2Next}
-              className="px-5 py-2.5 rounded-xl bg-[#e84e5f] hover:bg-[#d43d4e] text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md hover:shadow-lg active:scale-95"
+              className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md ${
+                validContacts.length >= 2
+                  ? 'bg-[#e84e5f] hover:bg-[#d43d4e] hover:shadow-lg active:scale-95'
+                  : 'bg-slate-400 cursor-not-allowed'
+              }`}
             >
               <span>Save & Set Medical ID</span>
               <ArrowRight className="w-4 h-4" />

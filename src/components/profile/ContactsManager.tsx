@@ -12,6 +12,8 @@ import {
   Shield,
   Save,
   AlertCircle,
+  CheckCircle2,
+  ShieldAlert,
 } from 'lucide-react';
 import { emergencyService } from '../../services/emergencyService';
 import { HonestStatusBadge } from '../common/HonestStatusBadge';
@@ -34,38 +36,45 @@ export const ContactsManager: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [newRelation, setNewRelation] = useState('');
   const [newPhone, setNewPhone] = useState('');
-  const [newPriority, setNewPriority] = useState<1 | 2 | 3>(1);
+  const [newPriority, setNewPriority] = useState<1 | 2 | 3>(
+    (Math.min(3, contacts.length + 1) as 1 | 2 | 3) || 1
+  );
 
   // Medical form local state
   const [medData, setMedData] = useState(medical);
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newPhone.trim()) return;
+    if (!newName.trim() || !newPhone.trim()) {
+      showToast('Please enter both contact name and phone number', 'error');
+      return;
+    }
 
     addContact({
-      name: newName,
-      relation: newRelation || 'Trusted Contact',
-      phone: newPhone,
+      name: newName.trim(),
+      relation: newRelation.trim() || 'Emergency Contact',
+      phone: newPhone.trim(),
       priority: newPriority,
-      customTemplate: 'EMERGENCY: I need help at my current live location.',
+      customTemplate: 'EMERGENCY: Urgent assistance needed at my live location.',
     });
 
     setIsAddOpen(false);
     setNewName('');
     setNewRelation('');
     setNewPhone('');
+    showToast(`Added ${newName} to emergency circle`, 'success');
   };
 
   const handleSaveMedical = (e: React.FormEvent) => {
     e.preventDefault();
     updateMedical(medData);
+    showToast('Medical Emergency ID updated successfully', 'success');
   };
 
   return (
     <div className="p-4 space-y-4 text-left">
       {/* HEADER */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <span className="text-[10px] font-bold text-indigo-600 tracking-wider uppercase block">
             PRECONFIGURED RESPONSE PLAN
@@ -78,7 +87,7 @@ export const ContactsManager: React.FC = () => {
       {/* TABS */}
       <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
         {[
-          { id: 'contacts', label: 'Contacts (3)' },
+          { id: 'contacts', label: `Contacts (${contacts.length})` },
           { id: 'medical', label: 'Medical ID' },
           { id: 'privacy', label: 'Security' },
         ].map((t) => (
@@ -100,23 +109,71 @@ export const ContactsManager: React.FC = () => {
       {activeTab === 'contacts' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#0f1d32]">
-              Emergency Escalation Order (P1 → P2 → P3)
-            </span>
-            <button
-              onClick={() => setIsAddOpen(true)}
-              className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer shadow-2xs"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add</span>
-            </button>
+            <div>
+              <span className="text-xs font-bold text-[#0f1d32] block">
+                Emergency Escalation Circle (Min 2 Required)
+              </span>
+              <span className="text-[11px] text-slate-500">
+                Escalates from Priority 1 to Priority 2 and 3 automatically during SOS.
+              </span>
+            </div>
+            {contacts.length < 3 && (
+              <button
+                onClick={() => setIsAddOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Contact</span>
+              </button>
+            )}
           </div>
+
+          {/* MINIMUM CONTACTS WARNING / CONFIRMATION BADGE */}
+          {contacts.length < 2 && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2.5">
+              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Incomplete Safety Circle:</strong> You currently have {contacts.length} contact configured. At least <strong>2 emergency contacts</strong> are required to ensure continuous backup escalation.
+              </span>
+            </div>
+          )}
+
+          {contacts.length >= 2 && (
+            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                <strong>Safety Circle Armed:</strong> {contacts.length} verified contacts configured for multi-tier emergency dispatch.
+              </span>
+            </div>
+          )}
+
+          {/* EMPTY STATE IF NO CONTACTS ADDED */}
+          {contacts.length === 0 && (
+            <div className="p-8 bg-white rounded-3xl border border-dashed border-slate-300 text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                <Users className="w-7 h-7" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-[#0f1d32]">No Emergency Contacts Added</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+                  You haven't configured any emergency contacts yet. In a crisis or accident, Mecra needs at least 2 trusted contacts to dispatch live alerts and GPS coordinates.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsAddOpen(true)}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add First Emergency Contact</span>
+              </button>
+            </div>
+          )}
 
           {/* CONTACTS CARDS */}
           {contacts.map((c) => (
             <div
               key={c.id}
-              className="p-4 bg-white rounded-3xl border border-[#e5ebf3] shadow-2xs space-y-3 text-left"
+              className="p-4 bg-white rounded-3xl border border-[#e5ebf3] shadow-xs space-y-3 text-left"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -160,35 +217,44 @@ export const ContactsManager: React.FC = () => {
 
                 <button
                   onClick={() =>
-                    emergencyService.openWhatsApp(
+                    emergencyService.openSmsApp(
                       c.phone,
-                      `[Mecra Safety Test] Hi ${c.name}, confirming your number is listed as my Priority ${c.priority} emergency contact.`
+                      c.customTemplate || 'EMERGENCY: Urgent help needed at my location.'
                     )
                   }
-                  className="flex-1 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
+                  className="flex-1 py-2 rounded-xl bg-[#f8fafd] hover:bg-slate-100 text-[#0f1d32] font-bold text-xs flex items-center justify-center gap-1.5 border border-[#e5ebf3] cursor-pointer"
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>WhatsApp</span>
+                  <span>SMS</span>
                 </button>
               </div>
             </div>
           ))}
 
-          {/* ADD CONTACT MODAL */}
+          {/* ADD CONTACT MODAL / DRAWER */}
           {isAddOpen && (
-            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-              <div className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl border text-left">
-                <h3 className="text-base font-black text-[#0f1d32] mb-3">Add Emergency Contact</h3>
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <h3 className="text-sm font-black text-[#0f1d32]">Add Emergency Contact</h3>
+                  <button
+                    onClick={() => setIsAddOpen(false)}
+                    className="text-xs text-slate-400 hover:text-slate-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+
                 <form onSubmit={handleAddSubmit} className="space-y-3 text-xs">
                   <div>
-                    <label className="font-bold text-[#0f1d32] block mb-1">Full Name</label>
+                    <label className="font-bold text-[#0f1d32] block mb-1">Contact Name</label>
                     <input
                       type="text"
-                      required
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. Sarah Morgan"
+                      placeholder="Enter Name"
                       className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
+                      required
                     />
                   </div>
 
@@ -198,25 +264,25 @@ export const ContactsManager: React.FC = () => {
                       type="text"
                       value={newRelation}
                       onChange={(e) => setNewRelation(e.target.value)}
-                      placeholder="e.g. Partner, Parent, Roommate"
+                      placeholder="Enter Relation (e.g. Spouse / Brother)"
                       className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
                     />
                   </div>
 
                   <div>
-                    <label className="font-bold text-[#0f1d32] block mb-1">Phone Number</label>
+                    <label className="font-bold text-[#0f1d32] block mb-1">Mobile Phone Number</label>
                     <input
                       type="tel"
-                      required
                       value={newPhone}
                       onChange={(e) => setNewPhone(e.target.value)}
-                      placeholder="+1 (555) 234-5678"
+                      placeholder="Enter Mobile Number (+91 ...)"
                       className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
+                      required
                     />
                   </div>
 
                   <div>
-                    <label className="font-bold text-[#0f1d32] block mb-1">Priority Rank</label>
+                    <label className="font-bold text-[#0f1d32] block mb-1">Priority Order</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[1, 2, 3].map((p) => (
                         <button
@@ -274,19 +340,26 @@ export const ContactsManager: React.FC = () => {
               type="text"
               value={medData.fullName}
               onChange={(e) => setMedData({ ...medData, fullName: e.target.value })}
+              placeholder="Enter Full Legal Name"
               className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-bold text-[#0f1d32] block mb-1">Blood Type</label>
-              <input
-                type="text"
+              <label className="font-bold text-[#0f1d32] block mb-1">Blood Group</label>
+              <select
                 value={medData.bloodType}
                 onChange={(e) => setMedData({ ...medData, bloodType: e.target.value })}
                 className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
-              />
+              >
+                <option value="">-- Select Blood Group --</option>
+                {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((bg) => (
+                  <option key={bg} value={bg}>
+                    {bg}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -295,6 +368,7 @@ export const ContactsManager: React.FC = () => {
                 type="text"
                 value={medData.primaryLanguage}
                 onChange={(e) => setMedData({ ...medData, primaryLanguage: e.target.value })}
+                placeholder="Enter Primary Language (e.g. Tamil, English)"
                 className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
               />
             </div>
@@ -306,7 +380,7 @@ export const ContactsManager: React.FC = () => {
               type="text"
               value={medData.severeHealthRisks || ''}
               onChange={(e) => setMedData({ ...medData, severeHealthRisks: e.target.value })}
-              placeholder="e.g. Acute bronchial asthma during panic / dust exposure"
+              placeholder="Enter Chronic Risks (e.g. Asthma, Cardiac, Diabetes, or 'None')"
               className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
             />
           </div>
@@ -318,6 +392,7 @@ export const ContactsManager: React.FC = () => {
                 type="text"
                 value={medData.allergies}
                 onChange={(e) => setMedData({ ...medData, allergies: e.target.value })}
+                placeholder="Enter Allergies (or 'None')"
                 className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
               />
             </div>
@@ -328,7 +403,7 @@ export const ContactsManager: React.FC = () => {
                 type="text"
                 value={medData.cityTown || ''}
                 onChange={(e) => setMedData({ ...medData, cityTown: e.target.value })}
-                placeholder="Kilambakkam, Chennai"
+                placeholder="Enter City / Town (e.g. Kilambakkam, Chennai)"
                 className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
               />
             </div>
@@ -340,6 +415,7 @@ export const ContactsManager: React.FC = () => {
               type="text"
               value={medData.medications}
               onChange={(e) => setMedData({ ...medData, medications: e.target.value })}
+              placeholder="Enter Current Medications (or 'None')"
               className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
             />
           </div>
@@ -350,6 +426,7 @@ export const ContactsManager: React.FC = () => {
               rows={3}
               value={medData.emergencyNotes}
               onChange={(e) => setMedData({ ...medData, emergencyNotes: e.target.value })}
+              placeholder="Enter instructions for paramedics or police (e.g. Inhaler location, pacemaker, ICE contact)"
               className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
             />
           </div>
@@ -369,7 +446,7 @@ export const ContactsManager: React.FC = () => {
         <div className="bg-white p-5 rounded-3xl border border-[#e5ebf3] shadow-xs space-y-4 text-xs text-[#0f1d32]">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
             <Shield className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-sm font-black text-[#0f1d32]">Privacy & Architecture</h3>
+            <h3 className="text-sm font-black text-[#0f1d32]">Privacy & Security Architecture</h3>
           </div>
 
           <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-emerald-950 leading-relaxed space-y-1">

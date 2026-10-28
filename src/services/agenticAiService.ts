@@ -4,32 +4,362 @@ import {
   TrustedContact,
   MedicalProfile,
   EmergencyCategory,
+  VehicleBreakdownRequest,
+  GuardianJourney,
+  EmergencyStatus,
+  EmergencyAlertRecord,
+  VehicleType,
+  BreakdownProblem,
 } from '../types';
 import { localDb } from './storage';
 import { locationService } from './locationService';
 
 export interface AgentContext {
+  currentPage: string;
   location: LocationData;
   activeCategory?: EmergencyCategory;
+  emergencyStatus: EmergencyStatus;
+  activeAlert: EmergencyAlertRecord | null;
   medical: MedicalProfile;
   contacts: TrustedContact[];
-  onTriggerEmergency?: (category: EmergencyCategory) => void;
+  activeBreakdown: VehicleBreakdownRequest | null;
+  activeJourney: GuardianJourney | null;
+  onTriggerEmergency?: (category: EmergencyCategory, note?: string) => void;
   onDispatchPolice?: () => void;
   onSendContactAlert?: (contactId: string) => void;
   onResolveSafe?: () => void;
+  onUpdateMedical?: (profile: Partial<MedicalProfile>) => void;
+  onAddContact?: (contact: Omit<TrustedContact, 'id'>) => void;
+  onSetActiveBreakdown?: (req: VehicleBreakdownRequest | null) => void;
+  onSetActiveJourney?: (journey: GuardianJourney | null) => void;
+  onNavigate?: (path: string) => void;
 }
 
 export const agenticAiService = {
-  // Process user input and return context-aware AI response with tool-call execution
+  // Process user input and return context-aware AI response with full tool-call execution
   processMessage: async (
     userInput: string,
     context: AgentContext
   ): Promise<AgentChatMessage> => {
-    const text = userInput.toLowerCase();
+    const raw = userInput.trim();
+    const text = raw.toLowerCase();
     const id = 'msg-' + Date.now();
     const timestamp = Date.now();
 
-    // 1. TOOL: TRIGGER IMMEDIATE SOS / EMERGENCY
+    // 1. TOOL: CALMING & PANIC GROUNDING (HUMAN-LIKE REASSURANCE)
+    if (
+      text.includes('panic') ||
+      text.includes('scared') ||
+      text.includes('calm') ||
+      text.includes('anxious') ||
+      text.includes('afraid') ||
+      text.includes('terrified') ||
+      text.includes('help me calm')
+    ) {
+      return {
+        id,
+        sender: 'agent',
+        text: `Take a slow, deep breath in with me right now.
+
+🌬️ **Breathe with Mecra (4-4-4-4 Technique):**
+1. Inhale deeply through your nose for 4 seconds...
+2. Hold your breath gently for 4 seconds...
+3. Exhale slowly through your mouth for 4 seconds...
+4. Rest your mind for 4 seconds.
+
+> *"You are stronger than this moment. Take one second at a time."*
+
+I am actively monitoring your location at **${context.location.town || 'Kilambakkam'}, ${context.location.city || 'Chennai'}**. Your GPS is locked. If you feel any physical threat, say **"Trigger SOS"** and I will alert authorities immediately. Otherwise, I am right here with you.`,
+        timestamp,
+        suggestions: [
+          'I am feeling calmer now',
+          'Call my emergency contact',
+          'Trigger SOS Alert',
+          'Where am I right now?',
+        ],
+        executedTool: {
+          name: 'calmPanicGrounding',
+          result: 'Grounding guide delivered. Emergency monitoring running continuously.',
+          actionType: 'record',
+        },
+      };
+    }
+
+    // 2. TOOL: FORM AUTO-FILL - MEDICAL PROFILE
+    if (
+      (text.includes('fill') || text.includes('update') || text.includes('set')) &&
+      (text.includes('medical') || text.includes('blood') || text.includes('allergy') || text.includes('name'))
+    ) {
+      const updates: Partial<MedicalProfile> = {};
+
+      // Parse blood group
+      const bgMatch = raw.match(/\b(O\+|O\-|A\+|A\-|B\+|B\-|AB\+|AB\-)\b/i);
+      if (bgMatch) updates.bloodType = bgMatch[1].toUpperCase();
+
+      // Parse full name
+      const nameMatch = raw.match(/name(?:\s+is|:)?\s+([A-Za-z\s]+?)(?:,|\.|\bwith\b|\band\b|$)/i);
+      if (nameMatch) updates.fullName = nameMatch[1].trim();
+
+      // Parse allergies
+      const allergyMatch = raw.match(/allerg(?:y|ies)(?:\s+is|:)?\s+([A-Za-z\s,]+?)(?:,|\.|\bwith\b|\band\b|$)/i);
+      if (allergyMatch) updates.allergies = allergyMatch[1].trim();
+
+      // Parse severe risks
+      const riskMatch = raw.match(/(?:risk|asthma|condition)(?:\s+is|:)?\s+([A-Za-z\s,]+?)(?:,|\.|\band\b|$)/i);
+      if (riskMatch) updates.severeHealthRisks = riskMatch[1].trim();
+
+      if (Object.keys(updates).length > 0) {
+        if (context.onUpdateMedical) context.onUpdateMedical(updates);
+        return {
+          id,
+          sender: 'agent',
+          text: `✅ I have automatically updated your Medical Emergency ID:
+${updates.fullName ? `• Name: **${updates.fullName}**\n` : ''}${updates.bloodType ? `• Blood Group: **${updates.bloodType}**\n` : ''}${updates.allergies ? `• Allergies: **${updates.allergies}**\n` : ''}${updates.severeHealthRisks ? `• Health Risks: **${updates.severeHealthRisks}**\n` : ''}
+These details are saved encrypted on your device and will be included in the paramedic intake card during emergency dispatches.`,
+          timestamp,
+          suggestions: [
+            'View my full patient card',
+            'Go to Safety & ID tab',
+            'Add emergency contact',
+          ],
+          executedTool: {
+            name: 'autoFillMedicalProfile',
+            result: `Updated fields: ${Object.keys(updates).join(', ')}`,
+            actionType: 'card',
+          },
+        };
+      }
+    }
+
+    // 3. TOOL: FORM AUTO-FILL - ADD EMERGENCY CONTACT
+    if (
+      (text.includes('add') || text.includes('save')) &&
+      (text.includes('contact') || text.includes('number') || text.includes('phone') || text.includes('person'))
+    ) {
+      // Extract phone number
+      const phoneMatch = raw.match(/(?:\+91[\s-]?)?[6-9]\d{9}|\b\d{10}\b/);
+      const phone = phoneMatch ? phoneMatch[0] : '';
+
+      // Extract name
+      const nameMatch = raw.match(/contact(?:\s+named|\s+is|:)?\s+([A-Za-z\s]+?)(?:,|\.|\bwith\b|\bphone\b|\bnumber\b|$)/i);
+      const name = nameMatch ? nameMatch[1].trim() : 'Emergency Contact';
+
+      // Extract relation
+      const relationMatch = raw.match(/(?:relation|who\s+is\s+my|as\s+my)\s+([A-Za-z]+)/i);
+      const relation = relationMatch ? relationMatch[1].trim() : 'Trusted Contact';
+
+      if (phone) {
+        if (context.onAddContact) {
+          context.onAddContact({
+            name,
+            relation,
+            phone: phone.startsWith('+91') ? phone : `+91 ${phone}`,
+            priority: (Math.min(3, context.contacts.length + 1) as 1 | 2 | 3) || 1,
+            customTemplate: 'EMERGENCY: Urgent assistance needed at my live location.',
+          });
+        }
+
+        return {
+          id,
+          sender: 'agent',
+          text: `✅ I have added **${name}** (${relation}) with phone number **${phone}** to your Priority Emergency Contacts!
+
+Your emergency circle now has **${context.contacts.length + 1}** contacts configured. In case of an emergency, live GPS coordinates will be sent to them.`,
+          timestamp,
+          suggestions: [
+            'Check my emergency circle',
+            'Add another contact',
+            'Where am I right now?',
+          ],
+          executedTool: {
+            name: 'addEmergencyContact',
+            result: `Saved contact: ${name} (${phone}) as Priority ${Math.min(3, context.contacts.length + 1)}`,
+            actionType: 'dispatch',
+          },
+        };
+      } else {
+        return {
+          id,
+          sender: 'agent',
+          text: `I can add an emergency contact for you. Please mention their Name and 10-digit mobile number, for example:
+*"Add contact Ramesh, relation brother, phone 9840123456"*`,
+          timestamp,
+          suggestions: ['Add contact Ramesh, phone 9840123456', 'Go to Safety & ID Setup'],
+        };
+      }
+    }
+
+    // 4. TOOL: FORM AUTO-FILL & DISPATCH - BREAKDOWN ASSISTANCE
+    if (
+      text.includes('breakdown') ||
+      text.includes('puncture') ||
+      text.includes('flat tyre') ||
+      text.includes('dead battery') ||
+      text.includes('jumpstart') ||
+      text.includes('overheat') ||
+      text.includes('tow')
+    ) {
+      let vType: VehicleType = 'Car';
+      if (text.includes('bike') || text.includes('motorcycle')) vType = 'Motorcycle';
+      else if (text.includes('scooter') || text.includes('activa') || text.includes('ev')) vType = 'Scooter';
+      else if (text.includes('truck') || text.includes('lorry')) vType = 'Truck';
+
+      let prob: BreakdownProblem = 'flat_tyre';
+      if (text.includes('battery') || text.includes('jumpstart')) prob = 'battery_dead';
+      else if (text.includes('overheat') || text.includes('smoke')) prob = 'engine_overheat';
+      else if (text.includes('fuel') || text.includes('charge')) prob = 'empty_fuel';
+      else if (text.includes('tow')) prob = 'towing_needed';
+      else if (text.includes('brake')) prob = 'brake_failure';
+      else if (text.includes('lock')) prob = 'locked_out';
+
+      const nearestMech = localDb.getServices('mechanic')[0];
+
+      if (context.onSetActiveBreakdown) {
+        context.onSetActiveBreakdown({
+          id: 'bd-' + Date.now(),
+          vehicleType: vType,
+          problem: prob,
+          description: `Assistance requested via AI Agent for ${vType} with ${prob.replace('_', ' ')}`,
+          status: 'REQUESTED',
+          assignedMechanic: nearestMech,
+          requestedAt: Date.now(),
+          etaMinutes: 12,
+          location: context.location,
+        });
+      }
+
+      if (context.onNavigate) context.onNavigate('/breakdown');
+
+      return {
+        id,
+        sender: 'agent',
+        text: `🚗 Roadside assistance has been prepared and logged!
+• **Vehicle:** ${vType}
+• **Issue:** ${prob.replace('_', ' ').toUpperCase()}
+• **Location:** ${context.location.address}
+• **Assigned Unit:** ${nearestMech?.name || 'NHAI 24/7 Mobile Recovery'} (ETA: 12 mins)
+
+I have taken you to the Breakdown Tracker. Would you like me to dial the mechanic directly?`,
+        timestamp,
+        suggestions: [
+          `Call ${nearestMech?.name || 'Mechanic'}`,
+          'Turn on Hazard Strobe Beacon',
+          'Share GPS via WhatsApp',
+        ],
+        executedTool: {
+          name: 'requestBreakdownAssistance',
+          result: `Dispatched ${nearestMech?.name} for ${vType} (${prob}). Navigated to /breakdown.`,
+          actionType: 'dispatch',
+        },
+      };
+    }
+
+    // 5. TOOL: START GUARDIAN JOURNEY TRIP
+    if (
+      (text.includes('start') || text.includes('track') || text.includes('monitor')) &&
+      (text.includes('trip') || text.includes('journey') || text.includes('ride') || text.includes('travel') || text.includes('going to'))
+    ) {
+      const destMatch = raw.match(/(?:to|heading to|destination)\s+([A-Za-z\s]+?)(?:,|\.|\bfor\b|\bin\b|$)/i);
+      const dest = destMatch ? destMatch[1].trim() : 'Destination';
+
+      const minMatch = raw.match(/(\d+)\s*(?:mins|minutes|m)/i);
+      const eta = minMatch ? parseInt(minMatch[1], 10) : 25;
+
+      const now = Date.now();
+      const journey: GuardianJourney = {
+        id: 'journey-' + now,
+        startLocation: context.location.address,
+        destination: dest,
+        etaMinutes: eta,
+        startedAt: now,
+        expectedArrivalAt: now + eta * 60000,
+        trustedContactId: context.contacts[0]?.id || '',
+        status: 'ACTIVE',
+        checkInIntervalMinutes: 10,
+        lastCheckInAt: now,
+        routeSafetyScore: 94,
+        currentSpeedKmH: 35,
+        isVehicleHalted: false,
+        timeline: [
+          {
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            event: `Journey initiated via AI Agent towards ${dest}`,
+            type: 'start',
+          },
+        ],
+      };
+
+      if (context.onSetActiveJourney) context.onSetActiveJourney(journey);
+      if (context.onNavigate) context.onNavigate('/guardian');
+
+      return {
+        id,
+        sender: 'agent',
+        text: `🛡️ Guardian Mode is now active for your trip!
+• **Destination:** ${dest}
+• **Estimated Duration:** ${eta} minutes
+• **Route Safety Score:** 94% (High-visibility, CCTV highway corridor)
+• **Monitoring Contact:** ${context.contacts[0]?.name || 'Primary Contact'}
+
+I am actively tracking your transit speed and route. If an unexpected halt occurs or ETA is exceeded, I will prompt your safety check-in.`,
+        timestamp,
+        suggestions: [
+          'I arrived safely',
+          'Discreet Fake Call',
+          'Breathe with Mecra',
+        ],
+        executedTool: {
+          name: 'startGuardianJourney',
+          result: `Guardian tracking active for ${dest} (${eta} mins). Navigated to /guardian.`,
+          actionType: 'dispatch',
+        },
+      };
+    }
+
+    // 6. TOOL: CONTEXT INSPECTION (WHAT PAGE AM I ON / WHAT DETAILS ARE SAVED)
+    if (
+      text.includes('where am i') ||
+      text.includes('my location') ||
+      text.includes('what page') ||
+      text.includes('what tab') ||
+      text.includes('current details') ||
+      text.includes('what are my details')
+    ) {
+      const pageNames: Record<string, string> = {
+        '/': 'Home Emergency SOS Dashboard',
+        '/map': 'Live Radar Map & Facilities Explorer',
+        '/breakdown': 'Highway Roadside Assistance Wizard',
+        '/guardian': 'Guardian Transit Journey Mode',
+        '/profile': 'Safety Circle & Medical ID Setup',
+        '/advisories': 'Local Safety Advisories & Alerts',
+      };
+
+      return {
+        id,
+        sender: 'agent',
+        text: `Here is your current operational context:
+📍 **Live GPS Location:** ${context.location.address}
+🌐 **Coordinates:** ${context.location.lat.toFixed(5)}° N, ${context.location.lng.toFixed(5)}° E (±${context.location.accuracy}m)
+📱 **Current Section:** ${pageNames[context.currentPage] || context.currentPage}
+👥 **Configured Contacts:** ${context.contacts.length} (${context.contacts.length >= 2 ? 'Active Safety Circle' : 'Incomplete - Min 2 required'})
+🩺 **Medical ID Name:** ${context.medical.fullName || 'Not configured'} (Blood: ${context.medical.bloodType || 'Not set'})
+🚨 **Emergency Status:** ${context.emergencyStatus}`,
+        timestamp,
+        suggestions: [
+          'Fill my medical profile',
+          'Add an emergency contact',
+          'Show nearest hospital',
+          'Share live GPS link',
+        ],
+        executedTool: {
+          name: 'inspectCurrentState',
+          result: `State verified: ${context.currentPage}, GPS accuracy ±${context.location.accuracy}m`,
+          actionType: 'share',
+        },
+      };
+    }
+
+    // 7. TOOL: IMMEDIATE SOS DANGER
     if (
       text.includes('help') ||
       text.includes('danger') ||
@@ -38,146 +368,38 @@ export const agenticAiService = {
       text.includes('attack') ||
       text.includes('threat')
     ) {
-      if (context.onTriggerEmergency) context.onTriggerEmergency('unsafe');
+      if (context.onTriggerEmergency) context.onTriggerEmergency('threat');
 
       return {
         id,
         sender: 'agent',
-        text: `I have detected an urgent safety situation. I am executing the emergency workflow now:
-1. Marked your live GPS at "${context.location.address}".
-2. Prepared dispatch alert for Metropolitan Central Police.
-3. Priority 1 contact (${context.contacts[0]?.name || 'Primary Contact'}) is in queue.
+        text: `🚨 Urgent Emergency Protocol Activated!
+1. Verified live coordinates at **${context.location.address}**.
+2. Alert logged to **${context.location.town || 'Kilambakkam'} Police Station (112)**.
+3. Alert sequence triggered for your **${context.contacts.length}** emergency contacts.
 
-If it is safe, move toward a public, well-lit place or staff member. Do you want me to initiate the police call?`,
+Stay in a crowded, well-lit place. Do you want me to dial Police 112 directly or trigger the Discreet Fake Call?`,
         timestamp,
         suggestions: [
-          'Yes, call police now',
-          'Send SMS to Sarah',
+          'Call Police 112 now',
+          'Discreet Fake Call',
+          'Record 3m video evidence',
           'I am in a safe spot now',
-          'Show nearest safe haven',
         ],
         executedTool: {
           name: 'executeEmergencyProtocol',
-          result: `Protocol activated: Location verified at ${context.location.lat.toFixed(4)}, ${context.location.lng.toFixed(4)}. Emergency alert initiated.`,
+          result: `Emergency alert activated for location ${context.location.lat.toFixed(4)}, ${context.location.lng.toFixed(4)}.`,
           actionType: 'dispatch',
         },
       };
     }
 
-    // 2. TOOL: MEDICAL ASSISTANCE
-    if (
-      text.includes('medical') ||
-      text.includes('heart') ||
-      text.includes('breathe') ||
-      text.includes('asthma') ||
-      text.includes('injury') ||
-      text.includes('blood') ||
-      text.includes('doctor')
-    ) {
-      if (context.onTriggerEmergency) context.onTriggerEmergency('medical');
-
-      return {
-        id,
-        sender: 'agent',
-        text: `Medical urgency registered.
-- Patient: ${context.medical.fullName} (Blood: ${context.medical.bloodType})
-- Medical note: ${context.medical.emergencyNotes}
-- Nearest Facility: St. Jude Memorial Trauma & Emergency Hospital (1.2 km away, ER Open 24/7).
-
-I can prepare the ambulance dispatch package or call St. Jude Emergency directly.`,
-        timestamp,
-        suggestions: [
-          'Call St. Jude ER',
-          'Notify Priority 1 Contact',
-          'Show route to Hospital',
-          'I am feeling better',
-        ],
-        executedTool: {
-          name: 'findNearestHospital',
-          result: 'Located St. Jude Memorial Hospital (1.2 km). Emergency contacts notified with medical brief.',
-          actionType: 'call',
-        },
-      };
-    }
-
-    // 3. TOOL: VEHICLE BREAKDOWN
-    if (
-      text.includes('breakdown') ||
-      text.includes('puncture') ||
-      text.includes('flat tyre') ||
-      text.includes('battery') ||
-      text.includes('tow') ||
-      text.includes('car') ||
-      text.includes('bike')
-    ) {
-      const mechanics = localDb.getServices('mechanic');
-      const nearest = mechanics[0];
-
-      return {
-        id,
-        sender: 'agent',
-        text: `Vehicle assistance protocol engaged.
-First, turn on hazard lights and ensure you and passengers are safe from moving traffic.
-- Nearest verified service: ${nearest ? nearest.name : 'SpeedyRecovery 24/7 Roadside'} (${nearest ? nearest.distanceKm : 0.7} km away).
-- Phone: ${nearest ? nearest.phone : '(555) 869-4433'}.
-
-Would you like me to open the Vehicle Breakdown Wizard or connect you with the mechanic?`,
-        timestamp,
-        suggestions: [
-          'Open Breakdown Wizard',
-          'Call Mechanic now',
-          'Share my breakdown location',
-          'Tow truck needed',
-        ],
-        executedTool: {
-          name: 'locateRoadsideAssistance',
-          result: `Matched ${nearest?.name || 'SpeedyRecovery'} (0.7 km). Average response time: 14 mins.`,
-          actionType: 'call',
-        },
-      };
-    }
-
-    // 4. TOOL: LOCATION SHARING
-    if (
-      text.includes('share location') ||
-      text.includes('send location') ||
-      text.includes('where am i') ||
-      text.includes('tracking')
-    ) {
-      const link = locationService.generateShareUrl(context.location, 60);
-
-      return {
-        id,
-        sender: 'agent',
-        text: `Here is your live location:
-- Address: ${context.location.address}
-- Coordinates: ${context.location.lat.toFixed(5)}° N, ${context.location.lng.toFixed(5)}° E
-- Accuracy: Within ±${context.location.accuracy} meters
-
-I have generated a secure live tracking link that expires in 60 minutes:
-${link}`,
-        timestamp,
-        suggestions: [
-          'Share via WhatsApp',
-          'Send SMS to Sarah',
-          'Copy tracking link',
-          'Show on interactive map',
-        ],
-        executedTool: {
-          name: 'generateLiveShareLink',
-          result: `Generated secure URL: ${link}`,
-          actionType: 'share',
-        },
-      };
-    }
-
-    // 5. TOOL: RESOLVE / CANCEL EMERGENCY
+    // 8. TOOL: RESOLVE / CANCEL EMERGENCY
     if (
       text.includes('safe now') ||
       text.includes('cancel') ||
       text.includes('i am fine') ||
-      text.includes('resolved') ||
-      text.includes('saved')
+      text.includes('resolved')
     ) {
       if (context.onResolveSafe) context.onResolveSafe();
 
@@ -185,51 +407,56 @@ ${link}`,
         id,
         sender: 'agent',
         text: `Understood! I have marked your status as **SAFE**.
-- Alert cancelled on device.
-- Safety check-in logged.
-- Priority contacts and police dispatch log updated with your safe confirmation.
+• Alert cancelled on device.
+• Emergency escalation paused.
+• Contacts and dispatch logs updated with your safe confirmation.
 
-We are keeping your log secure in local storage. Take a deep breath!`,
+Take a gentle, relaxing breath. I am standing by whenever you need me!`,
         timestamp,
         suggestions: [
           'Return to Home Dashboard',
-          'Send "I am safe" update to contacts',
-          'View Event Summary',
+          'View my contacts',
+          'Where am I right now?',
         ],
         executedTool: {
           name: 'markUserSafeAndNotify',
-          result: 'Emergency state cleared. Contacts alerted of safe status.',
+          result: 'Emergency state cleared safely.',
           actionType: 'dispatch',
         },
       };
     }
 
-    // 6. DEFAULT CALM SITUATIONAL GUIDANCE
+    // 9. DEFAULT HELPFUL AGENTIC ASSISTANCE
     return {
       id,
       sender: 'agent',
-      text: `I am your Mecra Emergency Agent. I am monitoring your location at "${context.location.address}".
+      text: `Hello! I am your **Mecra Agentic AI Companion**, connected directly to all components and data across the app.
 
-How can I assist you right now?
-• If you are in immediate danger, say **"I need help"** or tap the big red SOS button.
-• If your vehicle broke down, say **"Vehicle breakdown"**.
-• If you need medical guidance, say **"Medical emergency"**.
-• To send your live coordinates to a loved one, say **"Share location"**.`,
+I can actively help you:
+• **Fill forms:** *"Update my blood group to B+ and add asthma risk"*
+• **Add contacts:** *"Add contact Priya, relation spouse, phone 9840123456"*
+• **Request breakdown:** *"I have a flat tyre on my scooter"*
+• **Start safe journey:** *"Start trip to Tambaram for 25 mins"*
+• **Panic support:** *"Help me calm down"* or *"Trigger SOS alert"*
+
+How can I assist you right now?`,
       timestamp,
       suggestions: [
-        'I feel unsafe',
-        'Vehicle breakdown',
-        'Medical emergency',
-        'Share live location',
+        'Where am I right now?',
+        'Breathe with Mecra (Calm)',
+        'Vehicle breakdown assistance',
+        'Add an emergency contact',
       ],
     };
   },
 
-  // Web Speech API text-to-speech for audible emergency guidance
+  // Web Speech API text-to-speech
   speakInstruction: (text: string): void => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      // Clean markdown tags for natural speech
+      const clean = text.replace(/[*_#`>•]/g, '').replace(/https?:\/\/\S+/g, 'link attached');
+      const utterance = new SpeechSynthesisUtterance(clean);
       utterance.rate = 0.95;
       utterance.pitch = 1.0;
       window.speechSynthesis.speak(utterance);

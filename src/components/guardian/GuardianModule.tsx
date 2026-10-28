@@ -17,8 +17,14 @@ import {
   Volume2,
   Gauge,
   Navigation,
+  Heart,
+  Battery,
+  Lock,
+  MessageSquare,
+  ShieldAlert,
 } from 'lucide-react';
 import { emergencyService } from '../../services/emergencyService';
+import { locationService } from '../../services/locationService';
 import { HonestStatusBadge } from '../common/HonestStatusBadge';
 
 export const GuardianModule: React.FC = () => {
@@ -28,7 +34,7 @@ export const GuardianModule: React.FC = () => {
   const [destination, setDestination] = useState('Home (Tambaram Corridor)');
   const [etaMinutes, setEtaMinutes] = useState(25);
   const [selectedContactId, setSelectedContactId] = useState(
-    contacts[0]?.id || 'contact-1'
+    contacts[0]?.id || ''
   );
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
 
@@ -38,6 +44,47 @@ export const GuardianModule: React.FC = () => {
   const [callDuration, setCallDuration] = useState(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ringIntervalRef = useRef<number | null>(null);
+
+  // Breathing Panic Guide State
+  const [isBreathingActive, setIsBreathingActive] = useState(false);
+  const [breathingPhase, setBreathingPhase] = useState<'Inhale' | 'Hold' | 'Exhale' | 'Rest'>('Inhale');
+  const [breathingTimer, setBreathingTimer] = useState(4);
+
+  // Safe Passcode State
+  const [safePasscode, setSafePasscode] = useState('');
+  const [isPinPromptOpen, setIsPinPromptOpen] = useState(false);
+  const [enteredPin, setEnteredPin] = useState('');
+
+  // Update selected contact if contacts change
+  useEffect(() => {
+    if (!selectedContactId && contacts.length > 0) {
+      setSelectedContactId(contacts[0].id);
+    }
+  }, [contacts, selectedContactId]);
+
+  // Box Breathing Cycle Timer
+  useEffect(() => {
+    let timer: number | null = null;
+    if (isBreathingActive) {
+      timer = window.setInterval(() => {
+        setBreathingTimer((t) => {
+          if (t <= 1) {
+            setBreathingPhase((phase) => {
+              if (phase === 'Inhale') return 'Hold';
+              if (phase === 'Hold') return 'Exhale';
+              if (phase === 'Exhale') return 'Rest';
+              return 'Inhale';
+            });
+            return 4;
+          }
+          return t - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isBreathingActive]);
 
   // Countdown timer & halt detection for active journey
   useEffect(() => {
@@ -101,7 +148,6 @@ export const GuardianModule: React.FC = () => {
     setFakeCallStatus('RINGING');
     setCallDuration(0);
 
-    // Ring every 2.5 seconds
     playRingtonePulse();
     ringIntervalRef.current = window.setInterval(() => {
       playRingtonePulse();
@@ -115,11 +161,10 @@ export const GuardianModule: React.FC = () => {
     }
     setFakeCallStatus('CONNECTED');
 
-    // Speech synthesis voice
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(
-        "Hey! Where are you right now? I'm waiting right outside by the main entrance. Come out right away, I have the car started."
+        "Hey! Where are you right now? I'm waiting right outside by the main gate with the car. Come out right now."
       );
       utter.rate = 1.0;
       utter.pitch = 1.0;
@@ -139,7 +184,6 @@ export const GuardianModule: React.FC = () => {
     setFakeCallStatus('RINGING');
   };
 
-  // Connected call duration timer
   useEffect(() => {
     let callTimer: number | null = null;
     if (fakeCallStatus === 'CONNECTED') {
@@ -153,6 +197,7 @@ export const GuardianModule: React.FC = () => {
   }, [fakeCallStatus]);
 
   const handleStartJourney = () => {
+    const contactToUse = selectedContactId || contacts[0]?.id || '';
     const now = Date.now();
     const journey: GuardianJourney = {
       id: 'journey-' + now,
@@ -161,7 +206,7 @@ export const GuardianModule: React.FC = () => {
       etaMinutes,
       startedAt: now,
       expectedArrivalAt: now + etaMinutes * 60000,
-      trustedContactId: selectedContactId,
+      trustedContactId: contactToUse,
       status: 'ACTIVE',
       checkInIntervalMinutes: 10,
       lastCheckInAt: now,
@@ -171,14 +216,14 @@ export const GuardianModule: React.FC = () => {
       timeline: [
         {
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          event: `Journey started from ${location.town || 'Kilambakkam'} towards ${destination}`,
+          event: `Journey started towards ${destination}`,
           type: 'start',
         },
       ],
     };
 
     setActiveJourney(journey);
-    showToast(`Guardian Mode activated: Route Safety Score 94% (${etaMinutes}m ETA)`, 'success');
+    showToast(`Guardian Mode activated: Monitoring route to ${destination} (${etaMinutes}m ETA)`, 'success');
   };
 
   const handleManualCheckIn = () => {
@@ -211,7 +256,7 @@ export const GuardianModule: React.FC = () => {
         ...activeJourney.timeline,
         {
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          event: `Journey extended by ${mins} minutes (traffic delay).`,
+          event: `Journey extended by ${mins} minutes.`,
           type: 'checkin',
         },
       ],
@@ -222,12 +267,40 @@ export const GuardianModule: React.FC = () => {
 
   const handleCompleteSafe = () => {
     if (!activeJourney) return;
+    if (safePasscode) {
+      setIsPinPromptOpen(true);
+      return;
+    }
     setActiveJourney(null);
     showToast('🎉 Journey ended: Confirmed safely arrived at destination!', 'success');
   };
 
-  const handleTriggerMissedSos = () => {
-    triggerEmergency('unsafe', 'Guardian Mode missed check-in escalation');
+  const handleConfirmPin = () => {
+    if (enteredPin === safePasscode) {
+      setIsPinPromptOpen(false);
+      setEnteredPin('');
+      setActiveJourney(null);
+      showToast('🎉 Passcode Verified: Journey successfully ended!', 'success');
+    } else {
+      showToast('⚠️ Incorrect Passcode. Journey monitoring continues.', 'error');
+    }
+  };
+
+  // Stealth Silent Alert
+  const handleStealthAlert = () => {
+    triggerEmergency('threat', 'Discreet Silent Alert: User triggered covert assistance request.');
+    showToast('🤫 Silent Stealth Alert Dispatched. Coordinates sent to emergency circle.', 'error');
+  };
+
+  // Low Battery / SMS Fallback
+  const handleSendOfflineSms = () => {
+    const contact = contacts.find((c) => c.id === selectedContactId) || contacts[0];
+    if (!contact) {
+      showToast('No contact configured. Add one in Safety & ID setup.', 'error');
+      return;
+    }
+    const msg = `MECRA TRIP ALERT: Heading to ${destination}. Current GPS: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)} (${location.address}). Battery level low. Please track me.`;
+    emergencyService.openSmsApp(contact.phone, msg);
   };
 
   const formatCountdown = (totalSec: number) => {
@@ -240,10 +313,9 @@ export const GuardianModule: React.FC = () => {
 
   return (
     <div className="space-y-4 text-left">
-      {/* FAKE INCOMING CALL MODAL OVERLAY */}
+      {/* FAKE INCOMING CALL OVERLAY */}
       {isFakeCallActive && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-between p-8 text-white animate-fadeIn">
-          {/* TOP CALLER INFO */}
           <div className="flex flex-col items-center text-center mt-12 space-y-3">
             <div className="w-24 h-24 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center text-white shadow-2xl relative">
               <UserCheck className="w-12 h-12 text-slate-300" />
@@ -252,10 +324,10 @@ export const GuardianModule: React.FC = () => {
               )}
             </div>
             <div>
-              <h3 className="text-2xl font-black tracking-tight">Dad (Home ICE)</h3>
+              <h3 className="text-2xl font-black tracking-tight">Family Emergency Contact</h3>
               <p className="text-sm font-semibold text-slate-400 mt-1">
                 {fakeCallStatus === 'RINGING'
-                  ? 'Incoming Mobile Call (+91 98401 23456)...'
+                  ? 'Incoming Mobile Call...'
                   : `Call Active (${Math.floor(callDuration / 60)}:${(callDuration % 60)
                       .toString()
                       .padStart(2, '0')})`}
@@ -269,11 +341,9 @@ export const GuardianModule: React.FC = () => {
             )}
           </div>
 
-          {/* BOTTOM ACTIONS */}
           <div className="w-full max-w-xs flex items-center justify-around mb-12">
             {fakeCallStatus === 'RINGING' ? (
               <>
-                {/* DECLINE */}
                 <button
                   onClick={handleDeclineFakeCall}
                   className="flex flex-col items-center gap-2 cursor-pointer group"
@@ -284,7 +354,6 @@ export const GuardianModule: React.FC = () => {
                   <span className="text-xs font-bold text-slate-300">Decline</span>
                 </button>
 
-                {/* ACCEPT */}
                 <button
                   onClick={handleAcceptFakeCall}
                   className="flex flex-col items-center gap-2 cursor-pointer group"
@@ -296,7 +365,6 @@ export const GuardianModule: React.FC = () => {
                 </button>
               </>
             ) : (
-              /* END CALL */
               <button
                 onClick={handleDeclineFakeCall}
                 className="flex flex-col items-center gap-2 cursor-pointer group"
@@ -307,6 +375,43 @@ export const GuardianModule: React.FC = () => {
                 <span className="text-xs font-bold text-slate-300">End Escape Call</span>
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* SAFE ARRIVAL PIN PROMPT MODAL */}
+      {isPinPromptOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center">
+              <Lock className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-black text-[#0f1d32]">Enter Safe Passcode</h3>
+            <p className="text-xs text-slate-500">
+              Enter your 4-digit PIN to securely confirm your arrival and cancel Guardian tracking.
+            </p>
+            <input
+              type="password"
+              maxLength={4}
+              value={enteredPin}
+              onChange={(e) => setEnteredPin(e.target.value)}
+              placeholder="••••"
+              className="w-32 mx-auto text-center text-xl tracking-widest font-black py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none"
+            />
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={handleConfirmPin}
+                className="flex-1 py-3 bg-emerald-600 text-white font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Confirm Arrival
+              </button>
+              <button
+                onClick={() => setIsPinPromptOpen(false)}
+                className="py-3 px-4 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -332,6 +437,74 @@ export const GuardianModule: React.FC = () => {
           <HonestStatusBadge type="simulation" label="GPS SMART ROUTE" />
         </div>
       </div>
+
+      {/* PANIC & CALMING TOOLS STRIP */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {/* BOX BREATHING CALMING TRIGGER */}
+        <button
+          onClick={() => setIsBreathingActive(!isBreathingActive)}
+          className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+            isBreathingActive
+              ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+              : 'bg-white border-slate-200 text-[#0f1d32] hover:bg-blue-50/60'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Heart className={`w-4 h-4 ${isBreathingActive ? 'text-white' : 'text-blue-600'}`} />
+            <span>{isBreathingActive ? 'Close Breathing Guide' : 'Breathe with Mecra (Calm)'}</span>
+          </div>
+          <span className="text-[10px] font-semibold opacity-80">4-4-4-4</span>
+        </button>
+
+        {/* STEALTH SILENT ALERT */}
+        <button
+          onClick={handleStealthAlert}
+          className="p-3 rounded-2xl bg-white border border-rose-200 hover:bg-rose-50 text-[#e84e5f] text-xs font-bold flex items-center justify-between transition-all cursor-pointer shadow-xs"
+        >
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-[#e84e5f]" />
+            <span>Stealth Silent Alert</span>
+          </div>
+          <span className="text-[10px] text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded-md font-semibold">Covert</span>
+        </button>
+
+        {/* LOW BATTERY / OFFLINE SMS FALLBACK */}
+        <button
+          onClick={handleSendOfflineSms}
+          className="p-3 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold flex items-center justify-between transition-all cursor-pointer shadow-xs"
+        >
+          <div className="flex items-center gap-2">
+            <Battery className="w-4 h-4 text-emerald-600" />
+            <span>Offline SMS Fallback</span>
+          </div>
+          <span className="text-[10px] text-slate-500 font-semibold">2G/Low Net</span>
+        </button>
+      </div>
+
+      {/* INTERACTIVE BOX-BREATHING PANIC RELIEF WIDGET */}
+      {isBreathingActive && (
+        <div className="p-5 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-lg space-y-4 animate-fadeIn text-center">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-blue-200">
+              Box Breathing Panic De-escalation
+            </span>
+            <span className="text-xs text-blue-200 font-bold">4 Seconds Rhythm</span>
+          </div>
+
+          <div className="flex flex-col items-center justify-center py-4">
+            <div className="w-24 h-24 rounded-full border-4 border-white/40 flex flex-col items-center justify-center transition-all duration-1000 transform scale-105 animate-pulse bg-white/10">
+              <span className="text-2xl font-black">{breathingTimer}s</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-100">{breathingPhase}</span>
+            </div>
+            <p className="text-xs text-blue-100 max-w-xs mt-3 leading-relaxed">
+              {breathingPhase === 'Inhale' && 'Slowly breathe in deep through your nose...'}
+              {breathingPhase === 'Hold' && 'Hold your breath gently. Stay centered...'}
+              {breathingPhase === 'Exhale' && 'Slowly exhale through your mouth...'}
+              {breathingPhase === 'Rest' && 'Rest and relax your shoulders. You are safe.'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {!activeJourney ? (
         /* SETUP NEW JOURNEY CARD */
@@ -379,7 +552,7 @@ export const GuardianModule: React.FC = () => {
                 type="text"
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
-                placeholder="e.g. Home / Tambaram / Guindy"
+                placeholder="Enter destination (e.g. Home, Office, Metro)"
                 className="w-full p-3 text-xs bg-[#f8fafd] border border-[#e5ebf3] rounded-2xl focus:outline-none focus:border-emerald-500 text-[#0f1d32] font-semibold"
               />
             </div>
@@ -411,17 +584,38 @@ export const GuardianModule: React.FC = () => {
               <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
                 Safety Circle Monitor Contact
               </label>
-              <select
-                value={selectedContactId}
-                onChange={(e) => setSelectedContactId(e.target.value)}
-                className="w-full p-2.5 text-xs bg-[#f8fafd] border border-[#e5ebf3] rounded-2xl focus:outline-none focus:border-emerald-500 text-[#0f1d32] font-semibold"
-              >
-                {contacts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.relation}) — {c.phone}
-                  </option>
-                ))}
-              </select>
+              {contacts.length === 0 ? (
+                <div className="p-2.5 text-xs bg-amber-50 text-amber-800 rounded-2xl border border-amber-200 font-semibold">
+                  No contacts added yet. Configure contacts in Safety & ID setup.
+                </div>
+              ) : (
+                <select
+                  value={selectedContactId}
+                  onChange={(e) => setSelectedContactId(e.target.value)}
+                  className="w-full p-2.5 text-xs bg-[#f8fafd] border border-[#e5ebf3] rounded-2xl focus:outline-none focus:border-emerald-500 text-[#0f1d32] font-semibold"
+                >
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.relation}) — {c.phone}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* OPTIONAL SAFE PASSCODE */}
+            <div className="md:col-span-2">
+              <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                Optional Safe Arrival Passcode (Prevents Coerced Cancellation)
+              </label>
+              <input
+                type="password"
+                maxLength={4}
+                value={safePasscode}
+                onChange={(e) => setSafePasscode(e.target.value)}
+                placeholder="Set 4-digit PIN (e.g. 1234) or leave blank"
+                className="w-full p-3 text-xs bg-[#f8fafd] border border-[#e5ebf3] rounded-2xl focus:outline-none focus:border-emerald-500 text-[#0f1d32] font-semibold"
+              />
             </div>
           </div>
 
@@ -465,7 +659,7 @@ export const GuardianModule: React.FC = () => {
                 {formatCountdown(remainingSeconds)}
               </div>
               <p className="text-[11px] text-slate-600 mt-1">
-                Monitoring Contact: <strong>{guardianContact?.name}</strong> ({guardianContact?.phone})
+                Monitoring Contact: <strong>{guardianContact?.name || 'Emergency Circle'}</strong> ({guardianContact?.phone || 'Configured Contact'})
               </p>
             </div>
 
@@ -497,7 +691,7 @@ export const GuardianModule: React.FC = () => {
             </button>
 
             <button
-              onClick={handleTriggerMissedSos}
+              onClick={handleStealthAlert}
               className="py-3 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-300 text-[#e84e5f] text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <AlertTriangle className="w-4 h-4 text-[#e84e5f]" />
