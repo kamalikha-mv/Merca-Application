@@ -52,7 +52,7 @@ PATIENT MEDICAL INFORMATION:
 - Severe Risks: ${medical.severeHealthRisks || 'None reported'}
 - Known Allergies: ${medical.allergies || 'None'}
 - Current Medications: ${medical.medications || 'None'}
-- Home Town: ${medical.cityTown || (location.town ? location.town : 'Local Area')}
+- Home Town: ${medical.cityTown || (location.town ? location.town : 'Kilambakkam')}
 
 ICE EMERGENCY CONTACTS:
 ${contacts.map((c, i) => `P${i + 1}: ${c.name} (${c.relation}) - ${c.phone}`).join('\n')}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { SosButton } from '../components/emergency/SosButton';
 import { EmergencyCategorySheet } from '../components/emergency/EmergencyCategorySheet';
@@ -55,7 +55,7 @@ export const DashboardPage: React.FC = () => {
   const [isPatientCardOpen, setIsPatientCardOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<NearbyService | null>(null);
 
-  const services = localDb.getServices();
+  const services = useMemo(() => localDb.getServices(), [location]);
   const nearestPolice = services.find((s) => s.category === 'police');
   const nearestHospital = services.find((s) => s.category === 'hospital');
   const nearestPharmacy = services.find((s) => s.category === 'pharmacy');
@@ -423,7 +423,7 @@ export const DashboardPage: React.FC = () => {
           {/* VERIFIED LOCAL EMERGENCY HUBS STRIP (WITHIN 5-10KM) */}
           <div className="bg-white rounded-3xl border border-[#e5ebf3] p-4 shadow-xs space-y-3">
             <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
-              Immediate Safe Hubs in {location.town || (location.isLive ? 'Your Area' : 'Your Sector')}
+              Immediate Safe Hubs in {location.town || (location.isLive ? 'Kilambakkam' : 'Your Operational Zone')}
             </h4>
 
             {/* NEAREST POLICE */}
