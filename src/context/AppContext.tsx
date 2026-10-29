@@ -11,13 +11,13 @@ import {
   GuardianJourney,
 } from '../types';
 import { localDb } from '../services/storage';
-import { locationService } from '../services/locationService';
+import { locationService, INITIAL_UNRESOLVED_LOCATION } from '../services/locationService';
 
 interface AppContextType {
   // Location
   location: LocationData;
   isLoadingLocation: boolean;
-  refreshLocation: () => Promise<void>;
+  refreshLocation: (silent?: boolean) => Promise<void>;
 
   // Emergency Management
   emergencyStatus: EmergencyStatus;
@@ -30,12 +30,15 @@ interface AppContextType {
 
   // Contacts
   contacts: TrustedContact[];
+  saveContacts: (contacts: TrustedContact[]) => void;
   addContact: (contact: Omit<TrustedContact, 'id'>) => void;
   updateContact: (id: string, updates: Partial<TrustedContact>) => void;
   deleteContact: (id: string) => void;
+  refreshContacts: () => void;
 
   // Medical
   medical: MedicalProfile;
+  saveMedical: (profile: MedicalProfile) => void;
   updateMedical: (profile: Partial<MedicalProfile>) => void;
 
   // Breakdown Module
@@ -58,20 +61,10 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Location State (Default: Kilambakkam / Chennai Region, India)
-  const [location, setLocation] = useState<LocationData>({
-    lat: 12.8718,
-    lng: 80.0815,
-    address: 'Kilambakkam, Guduvancheri, Chennai Metropolitan Region, Tamil Nadu',
-    town: 'Kilambakkam',
-    city: 'Chengalpattu / Chennai',
-    state: 'Tamil Nadu',
-    country: 'India',
-    countryCode: '+91',
-    accuracy: 10,
-    timestamp: Date.now(),
-    isLive: false,
-    isPermissionGranted: false,
+  // Location State (Restores saved location if previously granted; otherwise clean unresolved state)
+  const [location, setLocation] = useState<LocationData>(() => {
+    const saved = localDb.getSavedLocation();
+    return saved || INITIAL_UNRESOLVED_LOCATION;
   });
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
@@ -105,27 +98,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   }, []);
 
-  // Fetch Location on initial load
-  const refreshLocation = useCallback(async () => {
-    setIsLoadingLocation(true);
-    try {
-      const loc = await locationService.getCurrentLocation();
-      setLocation(loc);
-      showToast(
-        loc.isLive
-          ? `📍 Live GPS locked: ${loc.town || loc.address.substring(0, 24)} (±${loc.accuracy}m)`
-          : `📍 Regional GPS locked: ${loc.town || 'Kilambakkam, Chennai'}`,
-        'success'
-      );
-    } catch {
-      showToast('⚠️ Could not fetch live GPS, calibrated to safe regional coordinates.', 'info');
-    } finally {
-      setIsLoadingLocation(false);
-    }
-  }, [showToast]);
+  // Fetch Location on demand or silently in background
+  const refreshLocation = useCallback(
+    async (silent = false) => {
+      if (!silent) setIsLoadingLocation(true);
+      try {
+        const loc = await locationService.getCurrentLocation(silent);
+        setLocation(loc);
 
+        if (loc.isLive && !silent) {
+          showToast(
+            `📍 GPS locked: ${loc.town || loc.address.substring(0, 24)} (±${loc.accuracy}m)`,
+            'success'
+          );
+        }
+      } catch {
+        if (!silent) {
+          showToast('⚠️ Could not fetch live GPS coordinates.', 'info');
+        }
+      } finally {
+        if (!silent) setIsLoadingLocation(false);
+      }
+    },
+    [showToast]
+  );
+
+  // Initial load GPS detection
   useEffect(() => {
-    refreshLocation();
+    refreshLocation(false);
+  }, [refreshLocation]);
+
+  // Periodic Background Location Tracking (Updates every 60s without re-prompting)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Run silent background refresh
+      refreshLocation(true);
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
   }, [refreshLocation]);
 
   // Voice Guidance Announcement
@@ -145,7 +155,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const policeStations = localDb.getServices('police');
       const nearestPolice = policeStations[0] || {
         id: 'pol-local-1',
-        name: `${location.town || 'Kilambakkam'} Police Station & Highway Unit`,
+        name: `${location.town ? location.town + ' ' : 'Local '}Police Station & Highway Unit`,
         phone: '112 / 100 / 044-27452222',
         address: 'GST Road Junction, Near KCBT Terminal',
       };
@@ -172,7 +182,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setEscalationStep(1);
       localDb.saveAlertRecord(newAlert);
 
-      showToast(`🚨 ALERT DISPATCHED: Logged to ${nearestPolice.name} & ICE circle`, 'error');
+      showToast(`🚨 ALERT DISPATCHED: Logged to ${nearestPolice.name} & emergency circle`, 'error');
 
       // Calibrated Voice Guidance
       let voiceMessage = 'Emergency alert activated. Help is on the way. Your live GPS coordinates are being shared.';
@@ -266,7 +276,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => clearInterval(timer);
   }, [emergencyStatus, contacts, showToast]);
 
-  // Contact CRUD
+  // Contact CRUD & Sync
+  const saveContacts = (newContacts: TrustedContact[]) => {
+    localDb.saveContacts(newContacts);
+    setContacts([...newContacts]);
+  };
+
+  const refreshContacts = () => {
+    const list = localDb.getContacts();
+    setContacts(list);
+  };
+
   const addContact = (contact: Omit<TrustedContact, 'id'>) => {
     const created = localDb.addContact(contact);
     setContacts(localDb.getContacts());
@@ -285,7 +305,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Contact removed', 'info');
   };
 
-  // Medical Updates
+  // Medical Updates & Sync
+  const saveMedical = (profile: MedicalProfile) => {
+    localDb.saveMedical(profile);
+    setMedical({ ...profile });
+  };
+
   const updateMedical = (updates: Partial<MedicalProfile>) => {
     const updated = { ...medical, ...updates };
     setMedical(updated);
@@ -319,10 +344,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markUserSafe,
         escalationStep,
         contacts,
+        saveContacts,
         addContact,
         updateContact,
         deleteContact,
+        refreshContacts,
         medical,
+        saveMedical,
         updateMedical,
         activeBreakdown,
         setActiveBreakdown,

@@ -8,6 +8,7 @@ import {
   GuardianJourney,
   VideoEvidenceRecord,
   IncidentPatientCardData,
+  LocationData,
 } from '../types';
 import { generateLocalServices } from './locationService';
 
@@ -23,6 +24,8 @@ const STORAGE_KEYS = {
   SETTINGS: 'merca_app_settings_v1',
   EVIDENCE: 'merca_video_evidence_v1',
   INCIDENT_CARDS: 'merca_incident_cards_v1',
+  SAVED_LOCATION: 'merca_saved_location_v1',
+  GUARDIAN_SETTINGS: 'merca_guardian_settings_v1',
 };
 
 // Default Trusted Contacts (starts empty - user must configure their own real contacts)
@@ -42,21 +45,21 @@ export const DEFAULT_MEDICAL: MedicalProfile = {
   allowEmergencyAccess: true,
 };
 
-// Default Local Services (Kilambakkam / Chennai base)
-export const DEFAULT_SERVICES: NearbyService[] = generateLocalServices(12.8718, 80.0815, 'Kilambakkam');
+// Default Local Services (Regional Corridor base)
+export const DEFAULT_SERVICES: NearbyService[] = generateLocalServices(12.8718, 80.0815, 'Regional Corridor');
 
 // Default Safety Advisories
 export const DEFAULT_ADVISORIES: SafetyAdvisory[] = [
   {
     id: 'adv-1',
-    title: 'Kilambakkam Bus Terminus (KCBT) Traffic & Transit Alert',
+    title: 'Central Highway & Transit Corridor Advisory',
     type: 'road_closure',
     severity: 'moderate',
-    description: 'Heavy passenger density around GST Road flyover ramp. High-visibility police patrol stationed at Terminal 2 gate.',
-    source: 'Greater Chennai Traffic Police Advisory',
+    description: 'Heavy passenger density around highway overpass ramp. High-visibility police patrol stationed at Terminal gate.',
+    source: 'Regional Traffic Police Advisory',
     reportedDate: 'Updated 20 mins ago',
     verified: true,
-    locationName: 'GST Road / KCBT Terminal, Kilambakkam',
+    locationName: 'National Highway Corridor',
     distanceKm: 0.6,
   },
   {
@@ -64,11 +67,11 @@ export const DEFAULT_ADVISORIES: SafetyAdvisory[] = [
     title: 'Heavy Rain / Monsoon Waterlogging Watch',
     type: 'weather',
     severity: 'moderate',
-    description: 'Intermittent heavy rain expected across Chengalpattu-Tambaram corridor. Emergency recovery vans on standby.',
+    description: 'Intermittent heavy rain expected across highway transit corridor. Emergency recovery vans on standby.',
     source: 'Regional Meteorological Centre',
     reportedDate: 'Today, 08:30 AM',
     verified: true,
-    locationName: 'Guduvancheri & Vandalur Highway Sector',
+    locationName: 'Highway Transit Sector',
     distanceKm: 2.4,
   },
   {
@@ -76,11 +79,11 @@ export const DEFAULT_ADVISORIES: SafetyAdvisory[] = [
     title: 'Women Safe Transit Corridor Active',
     type: 'official_notice',
     severity: 'low',
-    description: 'Pink Patrol auto-rickshaw safe bay and 24/7 CCTV surveillance operational at Transit concourse.',
+    description: 'Pink Patrol vehicle safe bay and 24/7 CCTV surveillance operational at Transit concourse.',
     source: 'District Women & Child Safety Cell',
     reportedDate: 'Active Standing Advisory',
     verified: true,
-    locationName: 'Kilambakkam Transit Concourse',
+    locationName: 'Transit Concourse Sector',
     distanceKm: 0.4,
   },
   {
@@ -308,6 +311,38 @@ export const localDb = {
       list.unshift(card);
     }
     localStorage.setItem(STORAGE_KEYS.INCIDENT_CARDS, JSON.stringify(list.slice(0, 20)));
+  },
+
+  // SAVED LOCATION
+  getSavedLocation: (): LocationData | null => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.SAVED_LOCATION);
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  saveLocation: (loc: LocationData): void => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SAVED_LOCATION, JSON.stringify(loc));
+    } catch (e) {
+      console.warn('Storage location write error', e);
+    }
+  },
+
+  // GUARDIAN CONFIGURATION
+  getGuardianSettings: (): { gracePeriodMinutes: number; escalateContactId: string } => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.GUARDIAN_SETTINGS);
+      return data ? JSON.parse(data) : { gracePeriodMinutes: 3, escalateContactId: '' };
+    } catch {
+      return { gracePeriodMinutes: 3, escalateContactId: '' };
+    }
+  },
+
+  saveGuardianSettings: (settings: { gracePeriodMinutes: number; escalateContactId: string }): void => {
+    localStorage.setItem(STORAGE_KEYS.GUARDIAN_SETTINGS, JSON.stringify(settings));
   },
 
   // PURGE ALL DATA (Privacy Requirement)

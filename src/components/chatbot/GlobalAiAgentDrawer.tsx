@@ -274,7 +274,7 @@ How can I assist you right now?`,
           {/* ACTIVE APPLICATION STATE CHIPS */}
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1 relative z-10 text-[10px] font-bold">
             <span className="px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700 text-slate-200 shrink-0">
-              📍 {location.town || 'Kilambakkam'} (±{location.accuracy}m)
+              📍 {location.town || (location.isLive || location.isPermissionGranted ? 'Your Area' : 'Acquiring GPS...')} {location.accuracy ? `(±${location.accuracy}m)` : ''}
             </span>
             <span className="px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700 text-slate-200 shrink-0">
               👥 {contacts.length} Contacts

@@ -1,17 +1,17 @@
 import { LocationData, NearbyService } from '../types';
 
-// Default fallback coordinates (Kilambakkam / Chennai Metropolitan Region, India)
-const FALLBACK_LOCATION: LocationData = {
-  lat: 12.8718,
-  lng: 80.0815,
-  address: 'Kilambakkam, Guduvancheri, Chennai Metropolitan Region, Tamil Nadu',
-  town: 'Kilambakkam',
-  city: 'Chengalpattu / Chennai',
-  state: 'Tamil Nadu',
+// Initial Unresolved Location (never display fake sample names before GPS authorization)
+export const INITIAL_UNRESOLVED_LOCATION: LocationData = {
+  lat: 0,
+  lng: 0,
+  address: 'Detecting live GPS location...',
+  town: '',
+  city: '',
+  state: '',
   country: 'India',
   countryCode: '+91',
-  accuracy: 12,
-  timestamp: Date.now(),
+  accuracy: 0,
+  timestamp: 0,
   isLive: false,
   isPermissionGranted: false,
 };
@@ -108,10 +108,10 @@ export async function reverseGeocodeFull(
   // If in Indian subcontinent bounds
   if (lat >= 8 && lat <= 36 && lng >= 68 && lng <= 97) {
     return {
-      address: 'Kilambakkam, Chengalpattu / Chennai Region, Tamil Nadu',
-      town: 'Kilambakkam',
-      city: 'Chengalpattu',
-      state: 'Tamil Nadu',
+      address: `Live GPS Position (${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E)`,
+      town: 'Local Area',
+      city: 'Current Region',
+      state: 'State',
       country: 'India',
       countryCode: '+91',
     };
@@ -128,7 +128,7 @@ export async function reverseGeocodeFull(
 }
 
 // Dynamically calibrate nearby services within 5-10 km radius of user's coordinates
-export function generateLocalServices(userLat: number, userLng: number, townName = 'Kilambakkam'): NearbyService[] {
+export function generateLocalServices(userLat: number, userLng: number, townName = 'Local Area'): NearbyService[] {
   const isIndia = userLat >= 8 && userLat <= 36 && userLng >= 68 && userLng <= 97;
 
   if (isIndia) {
@@ -236,6 +236,40 @@ export function generateLocalServices(userLat: number, userLng: number, townName
         verifiedDate: 'Highway Authority Approved',
       },
       {
+        id: 'mech-local-2',
+        name: `Highway 24/7 Hydraulic Flatbed Tow & Crane Service`,
+        category: 'mechanic',
+        lat: userLat + 0.011,
+        lng: userLng + 0.004,
+        distanceKm: calculateDistanceKm(userLat, userLng, userLat + 0.011, userLng + 0.004),
+        address: `Bypass Junction Service Road, Sector 4`,
+        phone: '98402-88776',
+        rating: 4.9,
+        reviewsCount: 185,
+        openHours: 'Open 24/7 Heavy Towing & Crane',
+        isOpen24x7: true,
+        isEmergencyService: true,
+        speciality: 'Hydraulic Flatbed Lift, Underlift Towing, Accident Recovery',
+        verifiedDate: 'Verified Breakdown Operator',
+      },
+      {
+        id: 'mech-local-3',
+        name: `Express Mobile Tyre Puncture & Battery Boost Van`,
+        category: 'mechanic',
+        lat: userLat - 0.004,
+        lng: userLng - 0.007,
+        distanceKm: calculateDistanceKm(userLat, userLng, userLat - 0.004, userLng - 0.007),
+        address: `NH Expressway Service Lane, Near Mile 28`,
+        phone: '98403-11223',
+        rating: 4.7,
+        reviewsCount: 240,
+        openHours: 'Open 24/7 Mobile Tyre & Jumpstart',
+        isOpen24x7: true,
+        isEmergencyService: false,
+        speciality: 'Tubeless Puncture Vulcanizing, Battery Jumpstart Van, On-spot Tyre Fitment',
+        verifiedDate: 'Automobile Association Certified',
+      },
+      {
         id: 'fuel-local-1',
         name: `Indian Oil 24/7 Fuel & EV Fast-Charging Station`,
         category: 'fuel',
@@ -330,10 +364,20 @@ export function generateLocalServices(userLat: number, userLng: number, townName
 
 export const locationService = {
   // Fetch Current User Location
-  getCurrentLocation: async (): Promise<LocationData> => {
+  getCurrentLocation: async (silent = false): Promise<LocationData> => {
     return new Promise((resolve) => {
+      // Check if user previously had a saved location from an authorized session
+      const saved = (() => {
+        try {
+          const d = localStorage.getItem('merca_saved_location_v1');
+          return d ? (JSON.parse(d) as LocationData) : null;
+        } catch {
+          return null;
+        }
+      })();
+
       if (!('geolocation' in navigator)) {
-        resolve(FALLBACK_LOCATION);
+        resolve(saved || INITIAL_UNRESOLVED_LOCATION);
         return;
       }
 
@@ -344,7 +388,7 @@ export const locationService = {
           const accuracy = Math.round(position.coords.accuracy || 10);
           const geodata = await reverseGeocodeFull(lat, lng);
 
-          resolve({
+          const result: LocationData = {
             lat,
             lng,
             address: geodata.address,
@@ -357,22 +401,43 @@ export const locationService = {
             timestamp: position.timestamp || Date.now(),
             isLive: true,
             isPermissionGranted: true,
-          });
+          };
+
+          try {
+            localStorage.setItem('merca_saved_location_v1', JSON.stringify(result));
+          } catch {
+            // ignore
+          }
+
+          resolve(result);
         },
         async () => {
-          // On Permission Denied or Timeout: return graceful simulated location
-          resolve({
-            ...FALLBACK_LOCATION,
-            timestamp: Date.now(),
-          });
+          // On Permission Denied or Timeout: return saved location if existed, else unresolved state
+          if (saved) {
+            resolve({ ...saved, isLive: false });
+          } else {
+            resolve({
+              ...INITIAL_UNRESOLVED_LOCATION,
+              address: 'GPS permission needed. Tap to detect location.',
+            });
+          }
         },
         {
           enableHighAccuracy: true,
-          timeout: 6000,
-          maximumAge: 30000,
+          timeout: 8000,
+          maximumAge: silent ? 60000 : 10000,
         }
       );
     });
+  },
+
+  // Save verified location
+  saveVerifiedLocation: (loc: LocationData) => {
+    try {
+      localStorage.setItem('merca_saved_location_v1', JSON.stringify(loc));
+    } catch {
+      // ignore
+    }
   },
 
   // Generate Unique Shareable Location Token & Link

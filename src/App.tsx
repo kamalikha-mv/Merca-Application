@@ -8,6 +8,7 @@ import { BreakdownPage } from './pages/BreakdownPage';
 import { GuardianPage } from './pages/GuardianPage';
 import { SafetyAdvisoriesPage } from './pages/SafetyAdvisoriesPage';
 import { ProfileSettingsPage } from './pages/ProfileSettingsPage';
+import { EvidencePage } from './pages/EvidencePage';
 
 export function App() {
   return (
@@ -19,6 +20,7 @@ export function App() {
             <Route path="/map" element={<MapExplorerPage />} />
             <Route path="/breakdown" element={<BreakdownPage />} />
             <Route path="/guardian" element={<GuardianPage />} />
+            <Route path="/evidence" element={<EvidencePage />} />
             <Route path="/advisories" element={<SafetyAdvisoriesPage />} />
             <Route path="/profile" element={<ProfileSettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

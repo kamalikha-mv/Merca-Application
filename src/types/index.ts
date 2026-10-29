@@ -105,8 +105,12 @@ export interface GuardianJourney {
   startedAt: number;
   expectedArrivalAt: number;
   trustedContactId: string;
-  status: 'ACTIVE' | 'CHECKED_IN' | 'ANOMALY_PROMPT' | 'COMPLETED_SAFE' | 'MISSED_ALERT';
+  escalateContactId?: string;
+  status: 'ACTIVE' | 'CHECKED_IN' | 'PAUSED' | 'DELAY_CHECK' | 'ESCALATED' | 'COMPLETED_SAFE' | 'CANCELLED';
   checkInIntervalMinutes: number;
+  gracePeriodMinutes?: number;
+  pausedUntil?: number;
+  isLocationSharingActive: boolean;
   lastCheckInAt: number;
   routeSafetyScore: number; // e.g. 92%
   currentSpeedKmH: number;

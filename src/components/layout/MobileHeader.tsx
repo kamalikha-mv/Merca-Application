@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { MapPin, RefreshCw, HeartPulse, AlertTriangle, ShieldAlert, Map, Wrench, Compass, UserCheck } from 'lucide-react';
+import { MapPin, RefreshCw, HeartPulse, AlertTriangle, ShieldAlert, Map, Wrench, Compass, UserCheck, Video } from 'lucide-react';
 import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 
 export const MobileHeader: React.FC = () => {
@@ -15,6 +15,7 @@ export const MobileHeader: React.FC = () => {
     { to: '/map', label: 'Live Map', icon: Map },
     { to: '/breakdown', label: 'Breakdown', icon: Wrench },
     { to: '/guardian', label: 'Guardian', icon: Compass },
+    { to: '/evidence', label: 'Evidence', icon: Video },
     { to: '/profile', label: 'Safety & ID', icon: UserCheck },
   ];
 
@@ -71,7 +72,7 @@ export const MobileHeader: React.FC = () => {
         <div className="flex items-center gap-2">
           {/* GPS LOCATION PILL */}
           <div
-            onClick={() => refreshLocation()}
+            onClick={() => refreshLocation(false)}
             title="Click to refresh real-time GPS"
             className="bg-[#f8fafd] hover:bg-[#f1f5fb] border border-[#e5ebf3] rounded-full px-3 py-1.5 flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
           >
@@ -80,20 +81,36 @@ export const MobileHeader: React.FC = () => {
                 location.isLive ? 'text-emerald-600' : 'text-blue-600'
               }`}
             />
-            <div className="flex flex-col text-left max-w-[110px] sm:max-w-[180px]">
-              <span className="text-[11px] font-bold text-[#0f1d32] truncate leading-tight">
-                {location.town || location.address.split(',')[0]}
-              </span>
-              <span className="text-[9px] text-[#627087] truncate leading-none">
-                {location.countryCode || '+91'} • {location.city || 'Chennai Region'}
-              </span>
-            </div>
+            {location.isLive || location.isPermissionGranted ? (
+              <div className="flex flex-col text-left max-w-[110px] sm:max-w-[180px]">
+                <span className="text-[11px] font-bold text-[#0f1d32] truncate leading-tight">
+                  {location.town || location.address.split(',')[0]}
+                </span>
+                <span className="text-[9px] text-[#627087] truncate leading-none">
+                  {location.countryCode || '+91'} • {location.city || 'Local Sector'}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 py-0.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700">Acquiring GPS...</span>
+              </div>
+            )}
             <RefreshCw
               className={`w-3 h-3 text-slate-400 shrink-0 ml-1 ${
                 isLoadingLocation ? 'animate-spin text-[#e84e5f]' : ''
               }`}
             />
           </div>
+
+          {/* MOBILE QUICK EVIDENCE CAMERA BUTTON */}
+          <button
+            onClick={() => navigate('/evidence')}
+            title="Open Dedicated Evidence Camera"
+            className="md:hidden w-9 h-9 rounded-xl border border-[#e5ebf3] bg-white text-slate-700 hover:text-[#e84e5f] flex items-center justify-center cursor-pointer transition-all active:scale-95 shadow-xs"
+          >
+            <Video className="w-4 h-4 text-purple-600" />
+          </button>
 
           {/* MEDICAL ID / EMERGENCY SHORTCUT */}
           <button

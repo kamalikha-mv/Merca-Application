@@ -69,7 +69,7 @@ export const agenticAiService = {
 
 > *"You are stronger than this moment. Take one second at a time."*
 
-I am actively monitoring your location at **${context.location.town || 'Kilambakkam'}, ${context.location.city || 'Chennai'}**. Your GPS is locked. If you feel any physical threat, say **"Trigger SOS"** and I will alert authorities immediately. Otherwise, I am right here with you.`,
+I am actively monitoring your location at **${context.location.town || (context.location.isPermissionGranted ? 'Your Local Sector' : 'Your Detected Region')}**. Your GPS status is armed. If you feel any physical threat, say **"Trigger SOS"** and I will alert authorities immediately. Otherwise, I am right here with you.`,
         timestamp,
         suggestions: [
           'I am feeling calmer now',
@@ -276,6 +276,8 @@ I have taken you to the Breakdown Tracker. Would you like me to dial the mechani
         trustedContactId: context.contacts[0]?.id || '',
         status: 'ACTIVE',
         checkInIntervalMinutes: 10,
+        gracePeriodMinutes: 5,
+        isLocationSharingActive: true,
         lastCheckInAt: now,
         routeSafetyScore: 94,
         currentSpeedKmH: 35,
@@ -375,7 +377,7 @@ I am actively tracking your transit speed and route. If an unexpected halt occur
         sender: 'agent',
         text: `🚨 Urgent Emergency Protocol Activated!
 1. Verified live coordinates at **${context.location.address}**.
-2. Alert logged to **${context.location.town || 'Kilambakkam'} Police Station (112)**.
+2. Alert logged to **${context.location.town ? context.location.town + ' ' : ''}Police Station (112)**.
 3. Alert sequence triggered for your **${context.contacts.length}** emergency contacts.
 
 Stay in a crowded, well-lit place. Do you want me to dial Police 112 directly or trigger the Discreet Fake Call?`,

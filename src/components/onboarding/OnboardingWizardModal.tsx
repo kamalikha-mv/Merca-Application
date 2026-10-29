@@ -25,7 +25,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   isOpen,
   onComplete,
 }) => {
-  const { location, refreshLocation, showToast } = useApp();
+  const { location, refreshLocation, saveContacts, saveMedical, showToast } = useApp();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isDetecting, setIsDetecting] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   // Handle Step 1 Permission and Detection
   const handleGrantPermission = async () => {
     setIsDetecting(true);
-    await refreshLocation();
+    await refreshLocation(false);
     setIsDetecting(false);
   };
 
@@ -92,13 +92,13 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
       return;
     }
 
-    localDb.saveContacts(validContacts);
+    saveContacts(validContacts);
     setStep(3);
   };
 
   // Handle Step 3 Finish
   const handleFinishOnboarding = () => {
-    localDb.saveMedical(medical);
+    saveMedical(medical);
     localDb.setOnboardingComplete(true);
     showToast(
       'Mecra calibrated for your region. Real-time safety network active!',
@@ -209,18 +209,29 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
               <div className="bg-white border-2 border-emerald-500/30 rounded-2xl p-4 shadow-xs">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                   <span>Detected Operational Region</span>
-                  <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">
-                    Armed
+                  <span className={`px-2 py-0.5 rounded-full font-bold ${location.isLive ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'}`}>
+                    {location.isLive ? 'Armed' : 'Pending Authorization'}
                   </span>
                 </div>
                 <div className="text-sm font-black text-[#0f1d32]">
-                  {location.town || 'Kilambakkam'}, {location.city || 'Chennai Metropolitan Area'}
+                  {location.isLive ? (
+                    `${location.town || location.address.split(',')[0]}, ${location.city || 'Region'}`
+                  ) : (
+                    <span className="flex items-center gap-2 text-slate-500 font-medium text-xs">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                      Click "Detect Live Location" above to verify GPS coordinates
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs text-slate-600 mt-1 flex items-center gap-2">
-                  <span>Country Code: <strong className="text-slate-800">{location.countryCode || '+91'} (India)</strong></span>
-                  <span>•</span>
-                  <span>State: <strong className="text-slate-800">{location.state || 'Tamil Nadu'}</strong></span>
-                </div>
+                {location.isLive && (
+                  <div className="text-xs text-slate-600 mt-1 flex items-center gap-2">
+                    <span>Country Code: <strong className="text-slate-800">{location.countryCode || '+91'} (India)</strong></span>
+                    <span>•</span>
+                    <span>State: <strong className="text-slate-800">{location.state || 'Tamil Nadu'}</strong></span>
+                    <span>•</span>
+                    <span>Accuracy: <strong className="text-slate-800">±{location.accuracy}m</strong></span>
+                  </div>
+                )}
               </div>
 
               {/* REGIONAL EMERGENCY NUMBERS */}

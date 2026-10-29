@@ -26,6 +26,12 @@ import {
   LifeBuoy,
   X,
   Zap,
+  MapPin,
+  ExternalLink,
+  ShieldCheck,
+  AlertCircle,
+  MessageSquare,
+  Send,
 } from 'lucide-react';
 import { HonestStatusBadge } from '../common/HonestStatusBadge';
 
@@ -63,7 +69,7 @@ const VehicleIcon: React.FC<{ type: VehicleType; className?: string }> = ({ type
 };
 
 export const BreakdownWizard: React.FC = () => {
-  const { location, activeBreakdown, setActiveBreakdown, showToast } = useApp();
+  const { location, contacts, activeBreakdown, setActiveBreakdown, showToast } = useApp();
 
   const [step, setStep] = useState<1 | 2 | 3>(activeBreakdown ? 3 : 1);
   const [vehicleType, setVehicleType] = useState<VehicleType>('Car');
@@ -72,6 +78,7 @@ export const BreakdownWizard: React.FC = () => {
   const [simulatedPhoto, setSimulatedPhoto] = useState<boolean>(false);
   const [isHazardFlasherActive, setIsHazardFlasherActive] = useState(false);
   const [flasherColor, setFlasherColor] = useState<'amber' | 'white'>('amber');
+  const [selectedMechanicId, setSelectedMechanicId] = useState<string>('');
 
   const mechanics = localDb.getServices('mechanic');
 
@@ -106,23 +113,57 @@ export const BreakdownWizard: React.FC = () => {
     }
   }, [activeBreakdown, setActiveBreakdown, showToast]);
 
+  // Sort and prioritize mechanics relevant to the breakdown issue
+  const relevantMechanics = React.useMemo(() => {
+    const list = [...mechanics];
+    if (problem === 'towing_needed' || problem === 'brake_failure' || problem === 'accident_minor') {
+      list.sort((a, b) => {
+        const aT = (a.speciality || '').toLowerCase().includes('tow') || (a.speciality || '').toLowerCase().includes('flatbed');
+        const bT = (b.speciality || '').toLowerCase().includes('tow') || (b.speciality || '').toLowerCase().includes('flatbed');
+        return (bT ? 1 : 0) - (aT ? 1 : 0);
+      });
+    } else if (problem === 'flat_tyre') {
+      list.sort((a, b) => {
+        const aT = (a.speciality || '').toLowerCase().includes('tyre') || (a.speciality || '').toLowerCase().includes('puncture');
+        const bT = (b.speciality || '').toLowerCase().includes('tyre') || (b.speciality || '').toLowerCase().includes('puncture');
+        return (bT ? 1 : 0) - (aT ? 1 : 0);
+      });
+    } else if (problem === 'battery_dead') {
+      list.sort((a, b) => {
+        const aT = (a.speciality || '').toLowerCase().includes('battery') || (a.speciality || '').toLowerCase().includes('jumpstart');
+        const bT = (b.speciality || '').toLowerCase().includes('battery') || (b.speciality || '').toLowerCase().includes('jumpstart');
+        return (bT ? 1 : 0) - (aT ? 1 : 0);
+      });
+    }
+    return list;
+  }, [mechanics, problem]);
+
+  // Set default selected mechanic if not set
+  useEffect(() => {
+    if (relevantMechanics.length > 0 && !selectedMechanicId) {
+      setSelectedMechanicId(relevantMechanics[0].id);
+    }
+  }, [relevantMechanics, selectedMechanicId]);
+
   const handleCreateRequest = () => {
-    const selectedMechanic = mechanics[0];
+    const chosenMechanic = relevantMechanics.find((m) => m.id === selectedMechanicId) || relevantMechanics[0] || mechanics[0];
+    const estimatedEta = Math.max(8, Math.round((chosenMechanic?.distanceKm || 2) * 3.5 + 4));
+
     const newRequest: VehicleBreakdownRequest = {
       id: 'bd-' + Date.now(),
       vehicleType,
       problem,
       description: notes || `Breakdown assistance for ${vehicleType} with ${problem.replace('_', ' ')}`,
       status: 'REQUESTED',
-      assignedMechanic: selectedMechanic,
+      assignedMechanic: chosenMechanic,
       requestedAt: Date.now(),
-      etaMinutes: 15,
+      etaMinutes: estimatedEta,
       location,
     };
 
     setActiveBreakdown(newRequest);
     setStep(3);
-    showToast('Roadside request submitted! Searching closest mobile mechanic...', 'info');
+    showToast(`Roadside request submitted! Dispatching ${chosenMechanic?.name || 'Mobile Recovery Unit'}...`, 'info');
   };
 
   const handleResolve = () => {
@@ -294,57 +335,245 @@ export const BreakdownWizard: React.FC = () => {
       {step === 2 && (
         <div className="bg-white p-5 rounded-3xl border border-[#e5ebf3] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <h3 className="text-sm font-black text-[#0f1d32]">Review Details & Send</h3>
+            <div>
+              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest block">
+                STEP 2 OF 2 • VERIFY & DISPATCH
+              </span>
+              <h3 className="text-base font-black text-[#0f1d32]">Assistance Overview & Dispatch</h3>
+            </div>
             <button
               onClick={() => setStep(1)}
-              className="text-xs text-slate-500 hover:text-slate-800 font-bold cursor-pointer"
+              className="px-3 py-1 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold cursor-pointer transition-colors"
             >
-              ← Edit Issue
+              ← Change Issue
             </button>
           </div>
 
-          {/* SELECTED PROBLEM SUMMARY */}
-          <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200 text-xs">
-            <div className="flex items-center gap-2 text-amber-900 font-bold">
-              <VehicleIcon type={vehicleType} className="w-4 h-4 text-amber-600" />
-              <span>{vehicleType} • {problem.replace('_', ' ').toUpperCase()}</span>
+          {/* ITEM 7: CLEAR GUIDANCE WHEN PROBLEM MAY MAKE VEHICLE UNSAFE TO DRIVE */}
+          {['brake_failure', 'flat_tyre', 'engine_overheat', 'towing_needed', 'accident_minor'].includes(problem) && (
+            <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-950 space-y-2 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-rose-800 font-black text-xs uppercase tracking-wide">
+                  <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 animate-pulse" />
+                  <span>CRITICAL HAZARD: VEHICLE UNSAFE TO DRIVE</span>
+                </div>
+                <span className="text-[10px] bg-rose-200/80 text-rose-900 font-black px-2 py-0.5 rounded-full uppercase">
+                  DO NOT DRIVE
+                </span>
+              </div>
+              <p className="text-xs text-rose-900 leading-relaxed font-semibold">
+                Operating this vehicle with <strong>{problemOptions.find((p) => p.id === problem)?.label}</strong> risks catastrophic brake loss, high-speed tyre blowouts, or engine fire. <strong>Do not attempt to limp or drive the vehicle.</strong>
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1 text-[11px] font-semibold text-rose-900">
+                <div className="flex items-center gap-1.5 bg-white/80 p-2 rounded-xl border border-rose-200">
+                  <span>🚨 Tap Hazard Beacon above immediately</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/80 p-2 rounded-xl border border-rose-200">
+                  <span>🛑 Pull steering fully onto left shoulder</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/80 p-2 rounded-xl border border-rose-200">
+                  <span>🚪 Exit via passenger door only (away from traffic)</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/80 p-2 rounded-xl border border-rose-200">
+                  <span>🛡️ Stand at least 15m behind crash barrier</span>
+                </div>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-600 mt-1">
-              Dispatching closest highway recovery flatbed with tool set.
-            </p>
+          )}
+
+          {/* SELECTED PROBLEM SUMMARY */}
+          <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black shrink-0">
+                <VehicleIcon type={vehicleType} className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-amber-700 uppercase block">Selected Issue</span>
+                <strong className="text-sm font-black text-[#0f1d32]">
+                  {vehicleType} • {problemOptions.find((p) => p.id === problem)?.label}
+                </strong>
+              </div>
+            </div>
+            <span className="text-xl">{problemOptions.find((p) => p.id === problem)?.icon}</span>
           </div>
 
-          {/* CURRENT GPS LOCATION */}
-          <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
-              Breakdown Location (Auto-Pinned)
-            </label>
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-[#0f1d32] font-semibold flex items-center justify-between">
-              <span className="truncate">{location.address}</span>
-              <span className="text-[10px] text-blue-600 font-mono shrink-0 ml-2">±{location.accuracy}m</span>
+          {/* ITEM 1: CURRENT LOCATION AND LOCATION ACCURACY */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                <span>1. Verified Breakdown Location</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] text-blue-700 font-mono font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                  Accuracy: ±{location.accuracy}m (GPS Locked)
+                </span>
+              </div>
+            </div>
+
+            <div className="text-xs text-[#0f1d32] font-semibold">
+              <p className="leading-snug">{location.address}</p>
+              <div className="text-[11px] font-mono text-slate-500 mt-1 flex items-center gap-2">
+                <span>GPS: {location.lat.toFixed(5)}°N, {location.lng.toFixed(5)}°E</span>
+                <span>•</span>
+                <a
+                  href={`https://maps.google.com/?q=${location.lat},${location.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-600 hover:underline flex items-center gap-0.5 text-[10px]"
+                >
+                  <span>Open in Maps</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* ITEM 5 & 6: LOCATION SHARING & NOTIFY TRUSTED CONTACT BUTTONS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {/* ITEM 5: SHARE BREAKDOWN LOCATION */}
+            <button
+              onClick={() => {
+                const msg = `🚨 VEHICLE BREAKDOWN ALERT:
+Vehicle: ${vehicleType}
+Issue: ${problemOptions.find((p) => p.id === problem)?.label}
+Location: ${location.address}
+Live GPS: https://maps.google.com/?q=${location.lat},${location.lng}
+Waiting safely on roadside shoulder. Need mechanic assistance.`;
+                emergencyService.openWhatsApp('', msg);
+              }}
+              className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-98"
+            >
+              <Share2 className="w-4 h-4 text-emerald-600" />
+              <span>Share Breakdown Location (WhatsApp)</span>
+            </button>
+
+            {/* ITEM 6: OPTION TO NOTIFY TRUSTED CONTACT */}
+            <button
+              onClick={() => {
+                const primaryContact = contacts[0];
+                if (!primaryContact) {
+                  showToast('No emergency contact configured. Add one in Safety & ID setup.', 'error');
+                  return;
+                }
+                const msg = `⚠️ BREAKDOWN ALERT: My ${vehicleType} has a breakdown (${problemOptions.find((p) => p.id === problem)?.label}) at ${location.address}. GPS: https://maps.google.com/?q=${location.lat},${location.lng}. I am safe waiting behind the crash barrier. Please track me.`;
+                emergencyService.openSmsApp(primaryContact.phone, msg);
+                showToast(`Alert prefilled for Primary Contact: ${primaryContact.name}`, 'success');
+              }}
+              className="p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 text-indigo-900 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-98"
+            >
+              <Send className="w-4 h-4 text-indigo-600" />
+              <span>
+                {contacts.length > 0
+                  ? `Notify ${contacts[0].name} (Contact 1)`
+                  : 'Notify Emergency Contact'}
+              </span>
+            </button>
+          </div>
+
+          {/* ITEM 2, 3, 4: NEARBY RELEVANT MECHANICS OR TOWING SERVICES */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-700 uppercase block">
+                  2. Nearby Relevant Recovery & Towing ({relevantMechanics.length})
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  Select a provider to dispatch or call directly
+                </span>
+              </div>
+              <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                Live Units Available
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {relevantMechanics.map((m) => {
+                const isSelected = selectedMechanicId === m.id;
+                const etaMins = Math.max(8, Math.round(m.distanceKm * 3.5 + 4));
+
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => setSelectedMechanicId(m.id)}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-50/70 border-amber-500 ring-2 ring-amber-400/40 shadow-xs'
+                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <input
+                          type="radio"
+                          name="selected_mechanic"
+                          checked={isSelected}
+                          onChange={() => setSelectedMechanicId(m.id)}
+                          className="mt-1 accent-amber-500 cursor-pointer"
+                        />
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <strong className="text-xs font-black text-[#0f1d32]">{m.name}</strong>
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold flex items-center gap-0.5">
+                              <ShieldCheck className="w-2.5 h-2.5" />
+                              <span>Verified</span>
+                            </span>
+                          </div>
+
+                          {/* ITEM 3: DISTANCE & ESTIMATED ARRIVAL TIME */}
+                          <div className="flex items-center gap-2 text-[11px] text-slate-600 mt-1 font-semibold">
+                            <span className="text-amber-700 font-bold">📍 {m.distanceKm} km away</span>
+                            <span>•</span>
+                            <span className="text-blue-700 font-bold flex items-center gap-0.5">
+                              <Clock className="w-3 h-3" />
+                              <span>ETA: ~{etaMins} mins</span>
+                            </span>
+                          </div>
+
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {m.speciality}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* ITEM 4: VERIFIED PHONE NUMBER / CONTACT OPTION */}
+                      <a
+                        href={`tel:${m.phone.split('/')[0].trim()}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-xs active:scale-95"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>Call</span>
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           {/* NOTES */}
           <div>
             <label className="text-xs font-bold text-[#0f1d32] block mb-1">
-              Additional Notes (Landmark, Car Model, etc.)
+              Vehicle Landmark & Colour / Notes
             </label>
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. White Swift, standing near NH 45 toll plaza mile 32..."
-              className="w-full p-2.5 text-xs bg-[#f8fafd] border border-[#e5ebf3] rounded-2xl focus:outline-none focus:border-amber-500"
+              placeholder="e.g. White Maruti Swift, standing 200m before toll plaza under lamp post #4..."
+              className="w-full p-2.5 text-xs bg-[#f8fafd] border border-[#e5ebf3] rounded-2xl focus:outline-none focus:border-amber-500 font-medium"
             />
           </div>
 
-          {/* CONFIRM BUTTON */}
+          {/* CONFIRM DISPATCH BUTTON */}
           <button
             onClick={handleCreateRequest}
-            className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs sm:text-sm uppercase tracking-wider cursor-pointer shadow-md active:scale-98 transition-transform"
+            className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs sm:text-sm uppercase tracking-wider cursor-pointer shadow-md active:scale-98 transition-transform flex items-center justify-center gap-2"
           >
-            Dispatch Nearest Roadside Mechanic
+            <Wrench className="w-4 h-4" />
+            <span>Dispatch Selected Recovery Unit Now</span>
           </button>
         </div>
       )}

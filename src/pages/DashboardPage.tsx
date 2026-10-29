@@ -244,7 +244,7 @@ export const DashboardPage: React.FC = () => {
 
             {/* TILE 3: EVIDENCE RECORDER */}
             <button
-              onClick={() => setIsEvidenceRecorderOpen(true)}
+              onClick={() => navigate('/evidence')}
               className="p-3.5 bg-white rounded-2xl border border-[#e5ebf3] hover:border-purple-400 shadow-xs flex flex-col items-center justify-center text-center gap-1 cursor-pointer transition-all hover:-translate-y-0.5 active:scale-95"
             >
               <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shadow-xs">
@@ -386,7 +386,7 @@ export const DashboardPage: React.FC = () => {
           {/* VERIFIED LOCAL EMERGENCY HUBS STRIP (WITHIN 5-10KM) */}
           <div className="bg-white rounded-3xl border border-[#e5ebf3] p-4 shadow-xs space-y-3">
             <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
-              Immediate Safe Hubs in {location.town || 'Kilambakkam'}
+              Immediate Safe Hubs in {location.town || (location.isLive ? 'Your Area' : 'Your Sector')}
             </h4>
 
             {/* NEAREST POLICE */}
