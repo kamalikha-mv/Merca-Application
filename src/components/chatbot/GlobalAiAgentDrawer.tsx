@@ -22,6 +22,7 @@ import {
   Compass,
   UserCheck,
 } from 'lucide-react';
+import { ChatMessageContent } from './ChatMessageContent';
 
 export const GlobalAiAgentDrawer: React.FC = () => {
   const {
@@ -54,16 +55,16 @@ export const GlobalAiAgentDrawer: React.FC = () => {
     {
       id: 'welcome-1',
       sender: 'agent',
-      text: `Hello! I am **Mecra Agentic AI**, connected live to your location, forms, and emergency protocols across the entire app.
+      text: `Hello! I am your **Mecra Safety Assistant**, connected live to your GPS, emergency contacts, and medical profile.
 
-I can actively help you:
-• **Fill forms:** *"Update my blood group to O+ and name to Rahul"*
-• **Add contacts:** *"Add contact Priya, relation spouse, phone 9840123456"*
-• **Roadside help:** *"I have a flat tyre on my scooter"*
-• **Safe journey:** *"Start trip to Tambaram for 25 mins"*
-• **Panic guidance:** *"Help me calm down"* or *"Trigger SOS alert"*
+I can help you take action quickly:
+• **Update Medical ID:** *"My blood group is B+ and my name is Alex"*
+• **Add Contact:** *"Add Dad as my emergency contact with phone 9840123456"*
+• **Vehicle Breakdown:** *"I have a flat tyre on my car"*
+• **Safe Journey:** *"Start a safe trip to Central Station for 20 mins"*
+• **Emergency / Panic:** *"Help me calm down"* or *"Trigger SOS alert"*
 
-How can I assist you right now?`,
+How can I help you right now?`,
       timestamp: Date.now(),
       suggestions: [
         'Where am I right now?',
@@ -327,8 +328,8 @@ How can I assist you right now?`,
                     : 'bg-white text-slate-800 border border-slate-200 rounded-bl-xs'
                 }`}
               >
-                {/* MESSAGE TEXT */}
-                <div className="whitespace-pre-line font-medium">{msg.text}</div>
+                {/* MESSAGE TEXT (FORMATTED MARKDOWN & CRISIS CARDS) */}
+                <ChatMessageContent text={msg.text} isUser={msg.sender === 'user'} />
 
                 {/* TOOL EXECUTION INDICATOR */}
                 {msg.executedTool && (

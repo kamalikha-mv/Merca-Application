@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   MapPin,
   Pill,
+  RefreshCw,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { emergencyService } from '../services/emergencyService';
@@ -34,7 +35,15 @@ import { localDb } from '../services/storage';
 import { NearbyService, EmergencyCategory } from '../types';
 
 export const DashboardPage: React.FC = () => {
-  const { location, triggerEmergency, emergencyStatus, activeAlert, showToast } = useApp();
+  const {
+    location,
+    isLoadingLocation,
+    refreshLocation,
+    triggerEmergency,
+    emergencyStatus,
+    activeAlert,
+    showToast,
+  } = useApp();
   const navigate = useNavigate();
 
   // Modals State
@@ -98,29 +107,57 @@ export const DashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: SOS CONTROLS & ADAPTIVE CRISIS ACTIONS (Cols: 7 on Desktop) */}
         <div className="lg:col-span-7 space-y-4">
-          {/* LOCATION STATUS BAR */}
-          <div className="p-3.5 bg-white rounded-2xl border border-[#e5ebf3] shadow-xs flex items-center justify-between text-xs">
+          {/* LOCATION STATUS BAR (INTERACTIVE ONE-TAP REFRESH) */}
+          <div
+            onClick={() => refreshLocation(false)}
+            className="p-3.5 bg-white hover:bg-slate-50/80 rounded-2xl border border-[#e5ebf3] hover:border-blue-300 shadow-xs flex items-center justify-between text-xs cursor-pointer transition-all group"
+            title="Click to detect or refresh GPS coordinates"
+          >
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="p-2 rounded-xl bg-blue-50 text-blue-600 shrink-0">
-                <MapPin className="w-4 h-4" />
+              <div className="p-2 rounded-xl bg-blue-50 group-hover:bg-blue-100 text-blue-600 shrink-0 transition-colors">
+                <MapPin className={`w-4 h-4 ${isLoadingLocation ? 'animate-bounce text-emerald-600' : ''}`} />
               </div>
               <div className="truncate">
-                <span className="text-[10px] font-bold text-[#5b6b82] uppercase tracking-wider block">
-                  ACTIVE GPS POSITION
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-[#5b6b82] uppercase tracking-wider block">
+                    ACTIVE GPS POSITION
+                  </span>
+                  {location.isLive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  )}
+                </div>
                 <span className="font-extrabold text-[#0f1d32] truncate block">
-                  {location.address}
+                  {isLoadingLocation ? 'Acquiring high-precision GPS lock...' : location.address}
                 </span>
               </div>
             </div>
 
-            <button
-              onClick={() => setIsShareOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors border border-blue-200"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Share GPS</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {!location.isLive && !location.isPermissionGranted && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    refreshLocation(false);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-transform"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isLoadingLocation ? 'animate-spin' : ''}`} />
+                  <span>{isLoadingLocation ? 'Detecting...' : 'Detect Location'}</span>
+                </button>
+              )}
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsShareOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors border border-blue-200"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share GPS</span>
+              </button>
+            </div>
           </div>
 
           {/* MAIN CENTRAL SOS TRIGGER BUTTON */}

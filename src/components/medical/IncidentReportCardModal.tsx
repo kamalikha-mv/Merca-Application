@@ -52,7 +52,7 @@ PATIENT MEDICAL INFORMATION:
 - Severe Risks: ${medical.severeHealthRisks || 'None reported'}
 - Known Allergies: ${medical.allergies || 'None'}
 - Current Medications: ${medical.medications || 'None'}
-- Home Town: ${medical.cityTown || 'Kilambakkam, Chennai'}
+- Home Town: ${medical.cityTown || (location.town ? location.town : 'Local Area')}
 
 ICE EMERGENCY CONTACTS:
 ${contacts.map((c, i) => `P${i + 1}: ${c.name} (${c.relation}) - ${c.phone}`).join('\n')}
@@ -139,13 +139,13 @@ ${contacts.map((c, i) => `P${i + 1}: ${c.name} (${c.relation}) - ${c.phone}`).jo
                   Patient Full Name
                 </span>
                 <h4 className="text-base font-black text-[#0f1d32] mt-0.5">
-                  {medical.fullName || 'Rahul Krishnan'}
+                  {medical.fullName || 'Registered User'}
                 </h4>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-200 text-xs">
                 <div>
                   <span className="text-slate-500 text-[10px] uppercase font-bold block">City / Town</span>
-                  <strong className="text-slate-800">{medical.cityTown || 'Kilambakkam, Chennai'}</strong>
+                  <strong className="text-slate-800">{medical.cityTown || (location.town ? location.town : 'Local District')}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 text-[10px] uppercase font-bold block">Language</span>

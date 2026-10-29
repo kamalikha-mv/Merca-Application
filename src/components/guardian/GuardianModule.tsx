@@ -38,7 +38,7 @@ export const GuardianModule: React.FC = () => {
   const { location, contacts, activeJourney, setActiveJourney, triggerEmergency, showToast } =
     useApp();
 
-  const [destination, setDestination] = useState('Home (Tambaram Corridor)');
+  const [destination, setDestination] = useState('Home');
   const [etaMinutes, setEtaMinutes] = useState(25);
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState<number>(5);
   const [selectedContactId, setSelectedContactId] = useState(

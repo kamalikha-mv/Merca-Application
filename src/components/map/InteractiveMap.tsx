@@ -61,8 +61,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         (mapContainerRef.current as any)._leaflet_id = null;
       }
 
+      const hasRealCoords = Boolean(location.lat && location.lng && location.lat !== 0);
+      const initialCenter: [number, number] = hasRealCoords
+        ? [location.lat, location.lng]
+        : services.length > 0
+        ? [services[0].lat, services[0].lng]
+        : [12.8718, 80.0815];
+
       const map = L.map(mapContainerRef.current, {
-        center: [location.lat, location.lng],
+        center: initialCenter,
         zoom: 14,
         zoomControl: false,
         attributionControl: false,
@@ -96,7 +103,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Recenter when location changes
   useEffect(() => {
-    if (leafletMapRef.current && location.lat && location.lng) {
+    if (leafletMapRef.current && location.lat && location.lng && location.lat !== 0) {
       leafletMapRef.current.setView([location.lat, location.lng], leafletMapRef.current.getZoom());
     }
   }, [location.lat, location.lng]);
@@ -107,33 +114,35 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     markersLayerRef.current.clearLayers();
 
-    // 1. User Location Pulse Marker
-    const userPinHtml = `
-      <div class="relative flex items-center justify-center">
-        <span class="absolute w-8 h-8 rounded-full bg-blue-500/40 animate-ping"></span>
-        <span class="absolute w-5 h-5 rounded-full bg-blue-400/50"></span>
-        <span class="relative w-3.5 h-3.5 rounded-full bg-blue-600 border-2 border-white shadow-lg"></span>
-      </div>
-    `;
+    // 1. User Location Pulse Marker (Rendered only with valid coordinates)
+    if (location.lat && location.lng && location.lat !== 0) {
+      const userPinHtml = `
+        <div class="relative flex items-center justify-center">
+          <span class="absolute w-8 h-8 rounded-full bg-blue-500/40 animate-ping"></span>
+          <span class="absolute w-5 h-5 rounded-full bg-blue-400/50"></span>
+          <span class="relative w-3.5 h-3.5 rounded-full bg-blue-600 border-2 border-white shadow-lg"></span>
+        </div>
+      `;
 
-    const userIcon = L.divIcon({
-      className: 'user-pulse-marker',
-      html: userPinHtml,
-      iconSize: [32, 32],
-      iconAnchor: [16, 16],
-    });
+      const userIcon = L.divIcon({
+        className: 'user-pulse-marker',
+        html: userPinHtml,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
 
-    const userMarker = L.marker([location.lat, location.lng], { icon: userIcon });
-    userMarker.bindPopup(`
-      <div class="p-1 text-xs">
-        <strong class="text-blue-700 block">Your Current Location</strong>
-        <p class="text-slate-600 mt-0.5">${location.address || 'Kilambakkam, Chennai'}</p>
-        <span class="inline-block mt-1 bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded text-[10px]">
-          GPS Accuracy: ±${location.accuracy}m
-        </span>
-      </div>
-    `);
-    markersLayerRef.current.addLayer(userMarker);
+      const userMarker = L.marker([location.lat, location.lng], { icon: userIcon });
+      userMarker.bindPopup(`
+        <div class="p-1 text-xs">
+          <strong class="text-blue-700 block">Your Current Location</strong>
+          <p class="text-slate-600 mt-0.5">${location.address || 'Live GPS Position'}</p>
+          <span class="inline-block mt-1 bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded text-[10px]">
+            GPS Accuracy: ±${location.accuracy}m
+          </span>
+        </div>
+      `);
+      markersLayerRef.current.addLayer(userMarker);
+    }
 
     // 2. Add Nearby Service Pins
     filteredServices.forEach((svc) => {
@@ -310,7 +319,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <div className="absolute left-3 bottom-3 z-20 bg-white/95 backdrop-blur-md border border-slate-200 rounded-full px-3 py-1 text-[11px] font-bold text-slate-800 shadow-md flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>
-            {location.town || 'Kilambakkam'} • {filteredServices.length} verified places nearby
+            {location.isLive || location.isPermissionGranted
+              ? `${location.town || 'Your Area'} • `
+              : ''}
+            {filteredServices.length} verified emergency places nearby
           </span>
         </div>
       </div>

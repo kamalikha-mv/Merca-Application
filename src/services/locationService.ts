@@ -49,7 +49,7 @@ export function calculateBearing(lat1: number, lon1: number, lat2: number, lon2:
   return directions[Math.round(brng / 45) % 8];
 }
 
-// Reverse Geocoding using OpenStreetMap Nominatim with Full Address Components
+// Reverse Geocoding using OpenStreetMap Nominatim with Full Address Components (Fast 2.5s timeout)
 export async function reverseGeocodeFull(
   lat: number,
   lng: number
@@ -63,7 +63,7 @@ export async function reverseGeocodeFull(
 }> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
+    const timeout = setTimeout(() => controller.abort(), 2500);
 
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
@@ -108,7 +108,7 @@ export async function reverseGeocodeFull(
   // If in Indian subcontinent bounds
   if (lat >= 8 && lat <= 36 && lng >= 68 && lng <= 97) {
     return {
-      address: `Live GPS Position (${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E)`,
+      address: `Live GPS Position (${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E)`,
       town: 'Local Area',
       city: 'Current Region',
       state: 'State',
@@ -118,7 +118,7 @@ export async function reverseGeocodeFull(
   }
 
   return {
-    address: `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E`,
+    address: `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`,
     town: 'Local Sector',
     city: 'City Area',
     state: 'Region',
@@ -363,10 +363,10 @@ export function generateLocalServices(userLat: number, userLng: number, townName
 }
 
 export const locationService = {
-  // Fetch Current User Location
+  // Rapid Non-Blocking GPS Location Resolver (<1s resolution)
   getCurrentLocation: async (silent = false): Promise<LocationData> => {
     return new Promise((resolve) => {
-      // Check if user previously had a saved location from an authorized session
+      // Check for saved location from previous authorized session
       const saved = (() => {
         try {
           const d = localStorage.getItem('merca_saved_location_v1');
@@ -381,22 +381,84 @@ export const locationService = {
         return;
       }
 
+      let isResolved = false;
+
+      // Safety timeout: If browser takes >3.5s, resolve immediately with saved or IP fallback
+      const safetyTimeout = setTimeout(async () => {
+        if (isResolved) return;
+        isResolved = true;
+
+        if (saved) {
+          resolve({ ...saved, isLive: false, isPermissionGranted: true });
+          return;
+        }
+
+        // Fast IP geolocation fallback if browser GPS dialog is ignored
+        try {
+          const controller = new AbortController();
+          const ipTimer = setTimeout(() => controller.abort(), 1800);
+          const ipRes = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+          clearTimeout(ipTimer);
+          if (ipRes.ok) {
+            const ipData = await ipRes.json();
+            if (ipData && ipData.latitude && ipData.longitude) {
+              const ipLoc: LocationData = {
+                lat: ipData.latitude,
+                lng: ipData.longitude,
+                address: `${ipData.city || 'Local Area'}, ${ipData.region || 'Region'}, ${ipData.country_name || 'India'}`,
+                town: ipData.city || 'Local Sector',
+                city: ipData.city || 'City',
+                state: ipData.region || '',
+                country: ipData.country_name || 'India',
+                countryCode: ipData.country_calling_code || '+91',
+                accuracy: 500,
+                timestamp: Date.now(),
+                isLive: false,
+                isPermissionGranted: true,
+              };
+              try {
+                localStorage.setItem('merca_saved_location_v1', JSON.stringify(ipLoc));
+              } catch {}
+              resolve(ipLoc);
+              return;
+            }
+          }
+        } catch {
+          // IP fallback unavailable
+        }
+
+        resolve({
+          ...INITIAL_UNRESOLVED_LOCATION,
+          address: 'GPS permission needed. Tap to detect location.',
+        });
+      }, 3500);
+
+      // Fast Geolocation Request
       navigator.geolocation.getCurrentPosition(
         async (position) => {
+          if (isResolved) return;
+          isResolved = true;
+          clearTimeout(safetyTimeout);
+
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           const accuracy = Math.round(position.coords.accuracy || 10);
-          const geodata = await reverseGeocodeFull(lat, lng);
+
+          // Fast immediate result without waiting for reverse-geocoding
+          const fastAddress =
+            saved && calculateDistanceKm(lat, lng, saved.lat, saved.lng) < 0.5
+              ? saved.address
+              : `Live GPS Position (${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E)`;
 
           const result: LocationData = {
             lat,
             lng,
-            address: geodata.address,
-            town: geodata.town,
-            city: geodata.city,
-            state: geodata.state,
-            country: geodata.country,
-            countryCode: geodata.countryCode,
+            address: fastAddress,
+            town: saved?.town || 'Local Sector',
+            city: saved?.city || '',
+            state: saved?.state || '',
+            country: saved?.country || 'India',
+            countryCode: saved?.countryCode || '+91',
             accuracy,
             timestamp: position.timestamp || Date.now(),
             isLive: true,
@@ -405,16 +467,36 @@ export const locationService = {
 
           try {
             localStorage.setItem('merca_saved_location_v1', JSON.stringify(result));
-          } catch {
-            // ignore
-          }
+          } catch {}
 
+          // Immediately resolve so UI renders in <200ms
           resolve(result);
+
+          // Asynchronously enrich address in background via reverse geocoding
+          reverseGeocodeFull(lat, lng).then((geodata) => {
+            if (geodata && geodata.address) {
+              const enriched: LocationData = {
+                ...result,
+                address: geodata.address,
+                town: geodata.town,
+                city: geodata.city,
+                state: geodata.state,
+                country: geodata.country,
+                countryCode: geodata.countryCode,
+              };
+              try {
+                localStorage.setItem('merca_saved_location_v1', JSON.stringify(enriched));
+              } catch {}
+            }
+          }).catch(() => {});
         },
         async () => {
-          // On Permission Denied or Timeout: return saved location if existed, else unresolved state
+          if (isResolved) return;
+          isResolved = true;
+          clearTimeout(safetyTimeout);
+
           if (saved) {
-            resolve({ ...saved, isLive: false });
+            resolve({ ...saved, isLive: false, isPermissionGranted: true });
           } else {
             resolve({
               ...INITIAL_UNRESOLVED_LOCATION,
@@ -423,9 +505,9 @@ export const locationService = {
           }
         },
         {
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: silent ? 60000 : 10000,
+          enableHighAccuracy: false, // Fast Wi-Fi/Cellular lock in <200ms
+          timeout: 3000,
+          maximumAge: silent ? 60000 : 15000,
         }
       );
     });

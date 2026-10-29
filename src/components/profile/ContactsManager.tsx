@@ -403,7 +403,7 @@ export const ContactsManager: React.FC = () => {
                 type="text"
                 value={medData.cityTown || ''}
                 onChange={(e) => setMedData({ ...medData, cityTown: e.target.value })}
-                placeholder="Enter City / Town (e.g. Kilambakkam, Chennai)"
+                placeholder="Enter City / Town (e.g. Current District or City)"
                 className="w-full p-2.5 bg-[#f8fafd] border border-[#e5ebf3] rounded-xl text-[#0f1d32]"
               />
             </div>

@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Globe,
 } from 'lucide-react';
+import { ChatMessageContent } from './ChatMessageContent';
 
 export const AgenticChatbot: React.FC = () => {
   const {
@@ -42,12 +43,12 @@ export const AgenticChatbot: React.FC = () => {
     {
       id: 'init-1',
       sender: 'agent',
-      text: `Hello! I am **Mecra Agentic AI Assistant**.
-I am actively connected to your GPS (${location.town || location.address.split(',')[0]}), your Medical Emergency profile, and your Priority Contacts list.
+      text: `Hello! I am your **Mecra Safety Assistant**.
+I am actively connected to your GPS (${location.isLive ? (location.town || location.address.split(',')[0]) : 'Live GPS'}), Medical ID, and Emergency Contacts.
 
 You can instruct me naturally:
-• *"Update my blood group to O+"*
-• *"Add contact Priya with number 9840123456"*
+• *"Update my blood group to B+"*
+• *"Add contact Dad with number 9840123456"*
 • *"Help! I have a flat tyre on my car"*
 • *"Help me calm down"* or *"Trigger SOS alert"*`,
       timestamp: Date.now(),
@@ -137,7 +138,7 @@ You can instruct me naturally:
 
         <div className="flex items-center gap-2">
           <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-bold">
-            {location.town || 'Kilambakkam'}
+            {location.town || (location.isLive || location.isPermissionGranted ? 'Your Area' : 'Local Sector')}
           </span>
         </div>
       </div>
@@ -158,7 +159,7 @@ You can instruct me naturally:
                   : 'bg-white text-slate-800 border border-[#e5ebf3] rounded-bl-xs'
               }`}
             >
-              <div className="whitespace-pre-line">{m.text}</div>
+              <ChatMessageContent text={m.text} isUser={m.sender === 'user'} />
 
               {/* TOOL EXECUTION INDICATOR */}
               {m.executedTool && (

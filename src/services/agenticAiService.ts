@@ -432,14 +432,14 @@ Take a gentle, relaxing breath. I am standing by whenever you need me!`,
     return {
       id,
       sender: 'agent',
-      text: `Hello! I am your **Mecra Agentic AI Companion**, connected directly to all components and data across the app.
+      text: `Hello! I am your **Mecra Safety Assistant**, connected directly to all components across the app.
 
-I can actively help you:
-• **Fill forms:** *"Update my blood group to B+ and add asthma risk"*
-• **Add contacts:** *"Add contact Priya, relation spouse, phone 9840123456"*
-• **Request breakdown:** *"I have a flat tyre on my scooter"*
-• **Start safe journey:** *"Start trip to Tambaram for 25 mins"*
-• **Panic support:** *"Help me calm down"* or *"Trigger SOS alert"*
+I can help you take action quickly:
+• **Update Medical ID:** *"Update my blood group to B+"*
+• **Add Contact:** *"Add contact Dad, relation parent, phone 9840123456"*
+• **Request Breakdown:** *"I have a flat tyre on my car"*
+• **Start Safe Journey:** *"Start trip to Central Station for 20 mins"*
+• **Panic Support:** *"Help me calm down"* or *"Trigger SOS alert"*
 
 How can I assist you right now?`,
       timestamp,
