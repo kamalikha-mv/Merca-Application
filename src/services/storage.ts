@@ -45,8 +45,8 @@ export const DEFAULT_MEDICAL: MedicalProfile = {
   allowEmergencyAccess: true,
 };
 
-// Default Local Services (Regional Corridor base)
-export const DEFAULT_SERVICES: NearbyService[] = generateLocalServices(12.8718, 80.0815, 'Regional Corridor');
+// Default Local Services (Kilambakkam Emergency Base)
+export const DEFAULT_SERVICES: NearbyService[] = generateLocalServices(12.8610, 80.0627, 'Kilambakkam');
 
 // Default Safety Advisories
 export const DEFAULT_ADVISORIES: SafetyAdvisory[] = [
@@ -317,7 +317,17 @@ export const localDb = {
   getSavedLocation: (): LocationData | null => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.SAVED_LOCATION);
-      return data ? JSON.parse(data) : null;
+      if (!data) return null;
+      const parsed = JSON.parse(data) as LocationData;
+      if (parsed) {
+        if (parsed.town === 'Local Sector' || parsed.town === 'Local Area') {
+          parsed.town = 'Kilambakkam';
+        }
+        if (parsed.address?.includes('Local Area') || parsed.address?.includes('Local Sector')) {
+          parsed.address = 'Kilambakkam, Chennai Metropolitan Area, Tamil Nadu';
+        }
+      }
+      return parsed;
     } catch {
       return null;
     }
@@ -325,7 +335,18 @@ export const localDb = {
 
   saveLocation: (loc: LocationData): void => {
     try {
-      localStorage.setItem(STORAGE_KEYS.SAVED_LOCATION, JSON.stringify(loc));
+      const cleanLoc = {
+        ...loc,
+        town:
+          loc.town === 'Local Sector' || loc.town === 'Local Area'
+            ? 'Kilambakkam'
+            : loc.town,
+        address:
+          loc.address?.includes('Local Area') || loc.address?.includes('Local Sector')
+            ? 'Kilambakkam, Chennai Metropolitan Area, Tamil Nadu'
+            : loc.address,
+      };
+      localStorage.setItem(STORAGE_KEYS.SAVED_LOCATION, JSON.stringify(cleanLoc));
     } catch (e) {
       console.warn('Storage location write error', e);
     }

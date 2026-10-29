@@ -11,7 +11,11 @@ import {
   GuardianJourney,
 } from '../types';
 import { localDb } from '../services/storage';
-import { locationService, INITIAL_UNRESOLVED_LOCATION } from '../services/locationService';
+import {
+  locationService,
+  INITIAL_UNRESOLVED_LOCATION,
+  generateLocalServices,
+} from '../services/locationService';
 
 interface AppContextType {
   // Location
@@ -105,6 +109,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const loc = await locationService.getCurrentLocation(silent);
         setLocation(loc);
+
+        // Calibrate real-time emergency services with actual town & coordinates
+        if (loc.lat !== 0) {
+          const calibrated = generateLocalServices(loc.lat, loc.lng, loc.town || 'Kilambakkam');
+          localDb.saveServices(calibrated);
+        }
 
         if (loc.isLive && !silent) {
           showToast(

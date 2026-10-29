@@ -60,6 +60,13 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Automatically trigger location detection on mount if not yet live/granted
+  React.useEffect(() => {
+    if (isOpen && step === 1 && (!location.isLive || !location.isPermissionGranted)) {
+      handleGrantPermission();
+    }
+  }, [isOpen, step]);
+
   // Handle Step 1 Permission and Detection
   const handleGrantPermission = async () => {
     setIsDetecting(true);
@@ -68,6 +75,11 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   };
 
   const handleStep1Next = () => {
+    if (!location.isLive && !location.isPermissionGranted) {
+      showToast('⚠️ Precise GPS permission is mandatory to calibrate emergency response.', 'error');
+      handleGrantPermission();
+      return;
+    }
     setStep(2);
   };
 
@@ -452,9 +464,20 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
           {step === 1 && (
             <button
               onClick={handleStep1Next}
-              className="px-5 py-2.5 rounded-xl bg-[#e84e5f] hover:bg-[#d43d4e] text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md hover:shadow-lg active:scale-95"
+              disabled={isDetecting}
+              className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md ${
+                location.isLive || location.isPermissionGranted
+                  ? 'bg-[#e84e5f] hover:bg-[#d43d4e] hover:shadow-lg active:scale-95'
+                  : 'bg-slate-400 hover:bg-slate-500'
+              }`}
             >
-              <span>Confirm & Set Contacts</span>
+              <span>
+                {location.isLive || location.isPermissionGranted
+                  ? 'Confirm & Set Contacts'
+                  : isDetecting
+                  ? 'Acquiring GPS Lock...'
+                  : 'Grant Location Access to Continue'}
+              </span>
               <ArrowRight className="w-4 h-4" />
             </button>
           )}

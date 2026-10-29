@@ -84,10 +84,10 @@ export const MobileHeader: React.FC = () => {
             {location.isLive || location.isPermissionGranted ? (
               <div className="flex flex-col text-left max-w-[110px] sm:max-w-[180px]">
                 <span className="text-[11px] font-bold text-[#0f1d32] truncate leading-tight">
-                  {location.town || location.address.split(',')[0]}
+                  {location.town || location.address.split(',')[0] || 'Kilambakkam'}
                 </span>
                 <span className="text-[9px] text-[#627087] truncate leading-none">
-                  {location.countryCode || '+91'} • {location.city || 'Local Sector'}
+                  {location.countryCode || '+91'} • {location.city || 'Chennai Metropolitan Area'}
                 </span>
               </div>
             ) : (

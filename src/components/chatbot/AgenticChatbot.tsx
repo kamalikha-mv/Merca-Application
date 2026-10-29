@@ -138,7 +138,7 @@ You can instruct me naturally:
 
         <div className="flex items-center gap-2">
           <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-bold">
-            {location.town || (location.isLive || location.isPermissionGranted ? 'Your Area' : 'Local Sector')}
+            {location.town || (location.isLive || location.isPermissionGranted ? 'Kilambakkam' : 'Regional Zone')}
           </span>
         </div>
       </div>

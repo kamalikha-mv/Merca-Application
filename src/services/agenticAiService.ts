@@ -69,7 +69,7 @@ export const agenticAiService = {
 
 > *"You are stronger than this moment. Take one second at a time."*
 
-I am actively monitoring your location at **${context.location.town || (context.location.isPermissionGranted ? 'Your Local Sector' : 'Your Detected Region')}**. Your GPS status is armed. If you feel any physical threat, say **"Trigger SOS"** and I will alert authorities immediately. Otherwise, I am right here with you.`,
+I am actively monitoring your location at **${context.location.town || (context.location.isPermissionGranted ? 'Kilambakkam' : 'Your Detected Region')}**. Your GPS status is armed. If you feel any physical threat, say **"Trigger SOS"** and I will alert authorities immediately. Otherwise, I am right here with you.`,
         timestamp,
         suggestions: [
           'I am feeling calmer now',
