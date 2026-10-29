@@ -545,14 +545,14 @@ export const locationService = {
           const accuracy = Math.round(position.coords.accuracy || 10);
 
           // Check if we have exact cached geodata or saved within 500m
-          let geodata: {
-            address: string;
-            town: string;
-            city: string;
-            state: string;
-            country: string;
-            countryCode: string;
-          } | null = null;
+          let geodata = {
+            address: saved?.address || 'Kilambakkam, Chennai Metropolitan Area, Tamil Nadu',
+            town: saved?.town || 'Kilambakkam',
+            city: saved?.city || 'Chennai Metropolitan Area',
+            state: saved?.state || 'Tamil Nadu',
+            country: saved?.country || 'India',
+            countryCode: saved?.countryCode || '+91',
+          };
 
           if (
             saved &&
@@ -564,10 +564,10 @@ export const locationService = {
             geodata = {
               address: saved.address,
               town: saved.town,
-              city: saved.city,
-              state: saved.state,
-              country: saved.country,
-              countryCode: saved.countryCode,
+              city: saved.city || 'Chennai Metropolitan Area',
+              state: saved.state || 'Tamil Nadu',
+              country: saved.country || 'India',
+              countryCode: saved.countryCode || '+91',
             };
           } else {
             geodata = await reverseGeocodeFull(lat, lng);
