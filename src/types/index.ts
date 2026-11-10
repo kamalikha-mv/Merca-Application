@@ -200,3 +200,5 @@ export interface EmergencyAlertRecord {
   resolvedAt?: number;
   resolutionNote?: string;
 }
+
+export * from './travelSafety';

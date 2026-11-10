@@ -9,6 +9,7 @@ import { GuardianPage } from './pages/GuardianPage';
 import { SafetyAdvisoriesPage } from './pages/SafetyAdvisoriesPage';
 import { ProfileSettingsPage } from './pages/ProfileSettingsPage';
 import { EvidencePage } from './pages/EvidencePage';
+import { TravelSafetyPage } from './pages/TravelSafetyPage';
 
 export function App() {
   return (
@@ -17,6 +18,7 @@ export function App() {
         <AppContainer>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/travel-safety" element={<TravelSafetyPage />} />
             <Route path="/map" element={<MapExplorerPage />} />
             <Route path="/breakdown" element={<BreakdownPage />} />
             <Route path="/guardian" element={<GuardianPage />} />

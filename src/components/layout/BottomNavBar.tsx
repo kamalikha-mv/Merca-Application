@@ -9,9 +9,9 @@ export const BottomNavBar: React.FC = () => {
 
   const navItems = [
     { to: '/', label: 'Emergency', icon: ShieldAlert, activeColor: 'text-[#e84e5f]' },
+    { to: '/travel-safety', label: 'Travel Safety', icon: Compass, activeColor: 'text-emerald-600' },
     { to: '/map', label: 'Live Map', icon: Map, activeColor: 'text-blue-600' },
     { to: '/breakdown', label: 'Breakdown', icon: Wrench, activeColor: 'text-amber-600' },
-    { to: '/guardian', label: 'Guardian', icon: Compass, activeColor: 'text-emerald-600' },
     { to: '/profile', label: 'Safety & ID', icon: UserCheck, activeColor: 'text-indigo-600' },
   ];
 

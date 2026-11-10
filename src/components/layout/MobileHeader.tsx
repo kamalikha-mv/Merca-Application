@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { MapPin, RefreshCw, HeartPulse, AlertTriangle, ShieldAlert, Map, Wrench, Compass, UserCheck, Video } from 'lucide-react';
+import { MapPin, RefreshCw, HeartPulse, AlertTriangle, ShieldAlert, ShieldCheck, Map, Wrench, Compass, UserCheck, Video } from 'lucide-react';
 import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 
 export const MobileHeader: React.FC = () => {
@@ -12,9 +12,10 @@ export const MobileHeader: React.FC = () => {
 
   const navLinks = [
     { to: '/', label: 'Emergency', icon: ShieldAlert },
+    { to: '/travel-safety', label: 'Travel Safety', icon: Compass },
     { to: '/map', label: 'Live Map', icon: Map },
     { to: '/breakdown', label: 'Breakdown', icon: Wrench },
-    { to: '/guardian', label: 'Guardian', icon: Compass },
+    { to: '/guardian', label: 'Guardian', icon: ShieldCheck },
     { to: '/evidence', label: 'Evidence', icon: Video },
     { to: '/profile', label: 'Safety & ID', icon: UserCheck },
   ];

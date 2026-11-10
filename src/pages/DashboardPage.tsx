@@ -28,6 +28,9 @@ import {
   MapPin,
   Pill,
   RefreshCw,
+  Navigation,
+  Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { emergencyService } from '../services/emergencyService';
@@ -54,6 +57,7 @@ export const DashboardPage: React.FC = () => {
   const [isEvidenceRecorderOpen, setIsEvidenceRecorderOpen] = useState(false);
   const [isPatientCardOpen, setIsPatientCardOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<NearbyService | null>(null);
+  const [quickDestination, setQuickDestination] = useState<string>('Chennai International Airport (MAA)');
 
   const services = useMemo(() => localDb.getServices(), [location]);
   const nearestPolice = services.find((s) => s.category === 'police');
@@ -253,8 +257,79 @@ export const DashboardPage: React.FC = () => {
             </div>
           )}
 
+          {/* PROMINENT TRAVEL SAFETY ENTRY BANNER (Requirement 1) */}
+          <div className="bg-gradient-to-r from-[#0f1d32] via-[#14233c] to-[#1c3052] rounded-3xl p-4 sm:p-5 border border-slate-700/80 shadow-md text-white relative overflow-hidden group">
+            <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-44 h-44 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10 mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30 shrink-0">
+                  <Compass className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full">
+                      Travel Safety System
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-white mt-0.5">
+                    Predictive Journey Analytics & Hazard Watch
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate('/travel-safety')}
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95 self-start sm:self-center"
+              >
+                <span>Open Travel Safety</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* QUICK DESTINATION ENTRY BAR WITH ANALYSE BUTTON */}
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 border border-white/15 flex flex-col sm:flex-row items-center gap-2 relative z-10">
+              <div className="flex-1 flex items-center gap-2 w-full px-2">
+                <Navigation className="w-4 h-4 text-[#e84e5f] shrink-0" />
+                <input
+                  type="text"
+                  value={quickDestination}
+                  onChange={(e) => setQuickDestination(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      navigate(`/travel-safety?dest=${encodeURIComponent(quickDestination)}`);
+                    }
+                  }}
+                  placeholder="Enter destination (e.g. Airport, Tambaram, OMR)..."
+                  className="bg-transparent text-xs text-white placeholder-slate-400 font-bold focus:outline-none w-full"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => navigate(`/travel-safety?dest=${encodeURIComponent(quickDestination)}`)}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#e84e5f] hover:bg-[#d43d4e] text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md shrink-0 active:scale-95"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Analyse My Journey</span>
+              </button>
+            </div>
+          </div>
+
           {/* QUICK ACTION TILES GRID */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+            {/* TILE 0: TRAVEL SAFETY */}
+            <button
+              onClick={() => navigate('/travel-safety')}
+              className="p-3.5 bg-white rounded-2xl border border-[#e5ebf3] hover:border-emerald-400 shadow-xs flex flex-col items-center justify-center text-center gap-1 cursor-pointer transition-all hover:-translate-y-0.5 active:scale-95 col-span-2 sm:col-span-1"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
+                <Compass className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-black text-[#0f1d32] mt-1">Travel Safety</span>
+              <span className="text-[10px] text-emerald-700 font-semibold">Route Analytics</span>
+            </button>
+
             {/* TILE 1: BREAKDOWN */}
             <button
               onClick={() => navigate('/breakdown')}
@@ -270,13 +345,13 @@ export const DashboardPage: React.FC = () => {
             {/* TILE 2: GUARDIAN */}
             <button
               onClick={() => navigate('/guardian')}
-              className="p-3.5 bg-white rounded-2xl border border-[#e5ebf3] hover:border-emerald-400 shadow-xs flex flex-col items-center justify-center text-center gap-1 cursor-pointer transition-all hover:-translate-y-0.5 active:scale-95"
+              className="p-3.5 bg-white rounded-2xl border border-[#e5ebf3] hover:border-blue-400 shadow-xs flex flex-col items-center justify-center text-center gap-1 cursor-pointer transition-all hover:-translate-y-0.5 active:scale-95"
             >
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
-                <Compass className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
+                <ShieldCheck className="w-5 h-5" />
               </div>
               <span className="text-xs font-black text-[#0f1d32] mt-1">Guardian</span>
-              <span className="text-[10px] text-emerald-700 font-semibold">Route Safety Watch</span>
+              <span className="text-[10px] text-blue-700 font-semibold">Route Safety Watch</span>
             </button>
 
             {/* TILE 3: EVIDENCE RECORDER */}
