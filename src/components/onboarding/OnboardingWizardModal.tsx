@@ -25,7 +25,15 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   isOpen,
   onComplete,
 }) => {
-  const { location, refreshLocation, setManualLocation, saveContacts, saveMedical, showToast } = useApp();
+  const {
+    location,
+    permissionState,
+    refreshLocation,
+    setManualLocation,
+    saveContacts,
+    saveMedical,
+    showToast,
+  } = useApp();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isDetecting, setIsDetecting] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
@@ -68,6 +76,50 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
       handleGrantPermission();
     }
   }, [isOpen, step]);
+
+  // Periodic background auto-detect ticker: continuously checks for permission grant and live GPS updates
+  React.useEffect(() => {
+    if (!isOpen || step !== 1) return;
+
+    // If location is already locked and granted, no need to poll
+    if (location.isLive && location.isPermissionGranted && location.lat !== 0) return;
+
+    let isMounted = true;
+
+    const autoCheck = async () => {
+      // 1. Check if browser permission flipped to granted
+      if ('permissions' in navigator) {
+        try {
+          const status = await navigator.permissions.query({ name: 'geolocation' });
+          if (status.state === 'granted') {
+            await refreshLocation(true, true);
+            return;
+          }
+        } catch {}
+      }
+
+      // 2. Silent fast cellular/Wi-Fi GPS detection attempt in background (<300ms)
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async () => {
+            if (!isMounted) return;
+            await refreshLocation(true, true);
+          },
+          () => {},
+          { enableHighAccuracy: false, timeout: 2000, maximumAge: 0 }
+        );
+      }
+    };
+
+    // Fast check immediately and repeat every 1.2 seconds in the background
+    autoCheck();
+    const interval = setInterval(autoCheck, 1200);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isOpen, step, location.isLive, location.isPermissionGranted, location.lat, refreshLocation]);
 
   // Handle Step 1 Permission and Detection
   const handleGrantPermission = async () => {
@@ -136,45 +188,45 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
-      <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto flex flex-col">
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-fadeIn">
+      <div className="bg-white w-full max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[88dvh]">
         {/* TOP BANNER */}
-        <div className="bg-gradient-to-r from-[#111e33] to-[#1c3052] text-white p-5 sm:p-6 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[#111e33] to-[#1c3052] text-white p-3 sm:p-4 relative overflow-hidden shrink-0">
           <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 bg-[#e84e5f]/20 rounded-full blur-2xl pointer-events-none" />
 
-          <div className="flex items-center justify-between relative z-10 mb-3">
+          <div className="flex items-center justify-between relative z-10 mb-2">
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-[#e84e5f] text-white flex items-center justify-center font-black text-lg shadow-md">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#e84e5f] text-white flex items-center justify-center font-black text-base sm:text-lg shadow-md shrink-0">
                 M
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-black tracking-tight leading-none text-white">
+                <h2 className="text-sm sm:text-base font-black tracking-tight leading-none text-white">
                   MECRA SAFETY INITIALIZATION
                 </h2>
-                <p className="text-[11px] text-slate-300 font-medium mt-1">
-                  Step {step} of 3 • First-Time Device Configuration
+                <p className="text-[10px] sm:text-[11px] text-slate-300 font-medium mt-0.5">
+                  Step {step} of 3 • First-Time Device Calibration
                 </p>
               </div>
             </div>
 
             {/* STEP PROGRESS PILLS */}
-            <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700">
+            <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-800/80 px-2 py-1 rounded-full border border-slate-700 shrink-0">
               {[1, 2, 3].map((s) => (
                 <span
                   key={s}
-                  className={`w-2 h-2 rounded-full transition-all ${
+                  className={`h-1.5 sm:h-2 rounded-full transition-all ${
                     step === s
-                      ? 'bg-[#e84e5f] w-5'
+                      ? 'bg-[#e84e5f] w-4 sm:w-5'
                       : step > s
-                      ? 'bg-emerald-400'
-                      : 'bg-slate-600'
+                      ? 'bg-emerald-400 w-1.5 sm:w-2'
+                      : 'bg-slate-600 w-1.5 sm:w-2'
                   }`}
                 />
               ))}
             </div>
           </div>
 
-          <p className="text-xs text-slate-300 leading-relaxed relative z-10">
+          <p className="text-[11px] sm:text-xs text-slate-300 leading-relaxed relative z-10">
             {step === 1 &&
               'Grant emergency permissions to auto-detect your location and configure regional emergency dispatch lines.'}
             {step === 2 &&
@@ -185,20 +237,20 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
         </div>
 
         {/* STEP CONTENT BODY */}
-        <div className="p-5 sm:p-6 max-h-[68vh] overflow-y-auto space-y-5">
+        <div className="p-3 sm:p-4 overflow-y-auto flex-1 space-y-3 text-xs">
           {/* STEP 1: PERMISSION & REGION DETECTION */}
           {step === 1 && (
-            <div className="space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 shrink-0">
-                    <MapPin className="w-5 h-5" />
+            <div className="space-y-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-3.5 flex flex-col gap-2.5">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-2 rounded-xl bg-blue-50 text-blue-600 shrink-0">
+                    <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
                   <div className="flex-1">
                     <h4 className="text-xs font-bold text-[#0f1d32] uppercase tracking-wide">
                       Location & Notification Permission
                     </h4>
-                    <p className="text-xs text-slate-600 mt-0.5">
+                    <p className="text-[11px] sm:text-xs text-slate-600 mt-0.5 leading-relaxed">
                       Used strictly on your device during crisis situations to dispatch verified GPS coordinates to emergency responders.
                     </p>
                   </div>
@@ -210,13 +262,15 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                     <span className="text-xs font-semibold text-slate-700">
                       {location.isLive
                         ? 'Real-Time GPS Connected'
+                        : permissionState === 'granted'
+                        ? 'Permission Granted (Locking Coordinates)'
                         : 'Simulated Safe Baseline'}
                     </span>
                   </div>
                   <button
                     onClick={handleGrantPermission}
                     disabled={isDetecting}
-                    className="px-3.5 py-1.5 rounded-xl bg-[#0f1d32] hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                    className="px-3.5 py-1.5 rounded-xl bg-[#0f1d32] hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
                   >
                     {isDetecting ? (
                       <span className="flex items-center gap-1.5">
@@ -234,30 +288,42 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
               </div>
 
               {/* DETECTED REGION HIGHLIGHT */}
-              <div className="bg-white border-2 border-emerald-500/30 rounded-2xl p-4 shadow-xs">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              <div className="bg-white border-2 border-emerald-500/30 rounded-2xl p-3 sm:p-3.5 shadow-xs">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                   <span>Detected Operational Region</span>
-                  <span className={`px-2 py-0.5 rounded-full font-bold ${location.isLive ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'}`}>
-                    {location.isLive ? 'Armed' : 'Pending Authorization'}
+                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] sm:text-xs ${
+                    location.isLive && location.lat !== 0
+                      ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                      : permissionState === 'granted' || isDetecting
+                      ? 'text-blue-700 bg-blue-50 border border-blue-200'
+                      : 'text-amber-700 bg-amber-50 border border-amber-200'
+                  }`}>
+                    {location.isLive && location.lat !== 0
+                      ? 'Armed'
+                      : permissionState === 'granted'
+                      ? 'Authorized • Locking GPS...'
+                      : isDetecting
+                      ? 'Authorizing...'
+                      : 'Pending Authorization'}
                   </span>
                 </div>
                 <div className="text-sm font-black text-[#0f1d32]">
                   {location.isLive && location.lat !== 0 ? (
                     `${location.town || location.address.split(',')[0]}, ${location.city || 'Region'}`
-                  ) : isDetecting ? (
+                  ) : permissionState === 'granted' || isDetecting ? (
                     <span className="flex items-center gap-2 text-blue-600 font-bold text-xs">
                       <span className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
-                      Scanning GPS satellites & regional hubs...
+                      Acquiring verified GPS coordinates & regional hubs...
                     </span>
                   ) : (
                     <span className="flex items-center gap-2 text-slate-500 font-medium text-xs">
                       <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-                      Click "Detect Live Location" above or select below
+                      Tap "Detect Live Location" above or select below
                     </span>
                   )}
                 </div>
                 {location.isLive && (
-                  <div className="text-xs text-slate-600 mt-1 flex items-center gap-2">
+                  <div className="text-[11px] text-slate-600 mt-1 flex flex-wrap items-center gap-2">
                     <span>Country Code: <strong className="text-slate-800">{location.countryCode || '+91'} (India)</strong></span>
                     <span>•</span>
                     <span>State: <strong className="text-slate-800">{location.state || 'Tamil Nadu'}</strong></span>
@@ -268,7 +334,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
               </div>
 
               {/* MANUAL AREA OVERRIDE / SELECTION (IF GPS DELAYED OR BLOCKED) */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-3.5 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-700">Or Select Your Region Manually:</span>
                   <button
@@ -310,7 +376,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                       onChange={(e) => setManualAreaText(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSetManual(manualAreaText)}
                       placeholder="Enter area, town or district..."
-                      className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500"
+                      className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-[16px] sm:text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500"
                     />
                     <button
                       type="button"
@@ -405,7 +471,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                         type="text"
                         value={contact.name}
                         onChange={(e) => handleContactChange(idx, 'name', e.target.value)}
-                        className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
+                        className="w-full text-[16px] sm:text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
                         placeholder="Enter Name"
                       />
                     </div>
@@ -415,7 +481,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                         type="text"
                         value={contact.relation}
                         onChange={(e) => handleContactChange(idx, 'relation', e.target.value)}
-                        className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
+                        className="w-full text-[16px] sm:text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
                         placeholder="Enter Relation (e.g. Spouse / Brother)"
                       />
                     </div>
@@ -425,7 +491,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                         type="tel"
                         value={contact.phone}
                         onChange={(e) => handleContactChange(idx, 'phone', e.target.value)}
-                        className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
+                        className="w-full text-[16px] sm:text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f]"
                         placeholder="Enter Mobile Number (+91 ...)"
                       />
                     </div>
@@ -437,32 +503,32 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
 
           {/* STEP 3: MEDICAL ID CARD SETUP (CLEAN PLACEHOLDERS) */}
           {step === 3 && (
-            <div className="space-y-3.5">
-              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 flex items-center gap-3">
+            <div className="space-y-3">
+              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-2.5 sm:p-3 flex items-center gap-2.5">
                 <HeartPulse className="w-5 h-5 text-[#e84e5f] shrink-0" />
-                <p className="text-xs text-rose-950 font-medium">
+                <p className="text-[11px] sm:text-xs text-rose-950 font-medium">
                   This card will be accessible by emergency paramedics and hospital casualty doctors during a 108 dispatch.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Full Legal Name</label>
+                  <label className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase">Full Legal Name</label>
                   <input
                     type="text"
                     value={medical.fullName}
                     onChange={(e) => setMedical({ ...medical, fullName: e.target.value })}
-                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
+                    className="w-full text-[16px] sm:text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-0.5"
                     placeholder="Enter Full Legal Name"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Blood Group</label>
+                  <label className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase">Blood Group</label>
                   <select
                     value={medical.bloodType}
                     onChange={(e) => setMedical({ ...medical, bloodType: e.target.value })}
-                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
+                    className="w-full text-[16px] sm:text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-0.5"
                   >
                     <option value="">-- Select Blood Group --</option>
                     {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((bg) => (
@@ -474,49 +540,49 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">
+                  <label className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase">
                     Known Allergies (Penicillin, Nuts, Latex, etc.)
                   </label>
                   <input
                     type="text"
                     value={medical.allergies}
                     onChange={(e) => setMedical({ ...medical, allergies: e.target.value })}
-                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
+                    className="w-full text-[16px] sm:text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-0.5"
                     placeholder="Enter Allergies (or type 'None')"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">
+                  <label className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase">
                     Severe Health Risks / Chronic Conditions
                   </label>
                   <input
                     type="text"
                     value={medical.severeHealthRisks}
                     onChange={(e) => setMedical({ ...medical, severeHealthRisks: e.target.value })}
-                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
+                    className="w-full text-[16px] sm:text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-0.5"
                     placeholder="Enter Chronic Risks (e.g. Asthma, Cardiac, Diabetes, or 'None')"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Current Medications</label>
+                  <label className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase">Current Medications</label>
                   <input
                     type="text"
                     value={medical.medications}
                     onChange={(e) => setMedical({ ...medical, medications: e.target.value })}
-                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
+                    className="w-full text-[16px] sm:text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-0.5"
                     placeholder="Enter Current Medications (or 'None')"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Home City / Town</label>
+                  <label className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase">Home City / Town</label>
                   <input
                     type="text"
                     value={medical.cityTown}
                     onChange={(e) => setMedical({ ...medical, cityTown: e.target.value })}
-                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-1"
+                    className="w-full text-[16px] sm:text-xs font-semibold px-2.5 py-1.5 sm:py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-[#e84e5f] mt-0.5"
                     placeholder="Enter City / Town"
                   />
                 </div>
@@ -526,7 +592,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
         </div>
 
         {/* BOTTOM ACTION BUTTONS */}
-        <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+        <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
           {step > 1 ? (
             <button
               onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}
@@ -541,21 +607,21 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
           {step === 1 && (
             <button
               onClick={handleStep1Next}
-              disabled={isDetecting}
+              disabled={isDetecting || (!location.isLive && location.lat === 0 && permissionState !== 'granted')}
               className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md ${
-                location.isLive || location.isPermissionGranted
+                (location.isLive && location.lat !== 0) || location.isPermissionGranted || permissionState === 'granted'
                   ? 'bg-[#e84e5f] hover:bg-[#d43d4e] hover:shadow-lg active:scale-95'
                   : 'bg-slate-400 hover:bg-slate-500'
               }`}
             >
               <span>
-                {location.isLive || location.isPermissionGranted
+                {location.isLive && location.lat !== 0
                   ? 'Confirm & Set Contacts'
-                  : isDetecting
-                  ? 'Acquiring GPS Lock...'
+                  : permissionState === 'granted' || isDetecting
+                  ? 'Locking Coordinates...'
                   : 'Grant Location Access to Continue'}
               </span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
 

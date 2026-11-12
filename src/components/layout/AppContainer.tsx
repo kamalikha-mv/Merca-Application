@@ -15,13 +15,12 @@ interface AppContainerProps {
 export const AppContainer: React.FC<AppContainerProps> = ({ children }) => {
   const { location, permissionState } = useApp();
 
-  // Show mandatory gate if user completed onboarding but precise GPS permission is not granted or device location is off
+  // Show mandatory gate if user completed onboarding but precise GPS permission is blocked or device location is off
   const isLocationGateRequired =
     localDb.isOnboardingComplete() &&
-    (!location.isPermissionGranted ||
-      !location.isLive ||
-      location.lat === 0 ||
-      permissionState !== 'granted');
+    (permissionState === 'denied' ||
+      permissionState === 'device_disabled' ||
+      (permissionState === 'prompt' && !location.isPermissionGranted));
 
   // Returning user session profile verification (prompt user to verify/update existing details on entry)
   const [isProfileVerificationOpen, setIsProfileVerificationOpen] = useState<boolean>(() => {

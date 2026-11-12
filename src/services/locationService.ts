@@ -50,7 +50,7 @@ export function calculateBearing(lat1: number, lon1: number, lat2: number, lon2:
 }
 
 // Ultra-Fast Dual IP Geolocation Engine (Zero API Key, CORS Enabled, <400ms)
-export async function fetchIpLocation(): Promise<LocationData> {
+export async function fetchIpLocation(isPermissionGranted = false): Promise<LocationData> {
   // Engine 1: BigDataCloud Client IP Reverse Geocode
   try {
     const controller = new AbortController();
@@ -86,10 +86,10 @@ export async function fetchIpLocation(): Promise<LocationData> {
           state,
           country,
           countryCode,
-          accuracy: 5000,
+          accuracy: isPermissionGranted ? 250 : 5000,
           timestamp: Date.now(),
-          isLive: false,
-          isPermissionGranted: false,
+          isLive: isPermissionGranted,
+          isPermissionGranted,
         };
         return loc;
       }
@@ -121,10 +121,10 @@ export async function fetchIpLocation(): Promise<LocationData> {
           state,
           country,
           countryCode,
-          accuracy: 5000,
+          accuracy: isPermissionGranted ? 350 : 5000,
           timestamp: Date.now(),
-          isLive: false,
-          isPermissionGranted: false,
+          isLive: isPermissionGranted,
+          isPermissionGranted,
         };
         return loc;
       }
@@ -141,10 +141,10 @@ export async function fetchIpLocation(): Promise<LocationData> {
     state: 'Tamil Nadu',
     country: 'India',
     countryCode: '+91',
-    accuracy: 5000,
+    accuracy: isPermissionGranted ? 100 : 5000,
     timestamp: Date.now(),
-    isLive: false,
-    isPermissionGranted: false,
+    isLive: isPermissionGranted,
+    isPermissionGranted,
   };
 }
 
@@ -608,8 +608,8 @@ export const locationService = {
     const silent =
       typeof optionsOrSilent === 'object' ? Boolean(optionsOrSilent.silent) : optionsOrSilent;
 
-    // Deduplicate in-flight requests (prevent duplicate concurrent browser prompts / geolocation calls)
-    if (inFlightLocationPromise) {
+    // Deduplicate only if in flight and recent (do not block forceRefresh requests)
+    if (inFlightLocationPromise && !forceRefresh) {
       return inFlightLocationPromise;
     }
 
@@ -625,8 +625,8 @@ export const locationService = {
             typeof parsed.lat === 'number' &&
             parsed.lat !== 0 &&
             parsed.town &&
-            !parsed.town.includes('Local Sector') &&
-            !parsed.town.includes('Local Area')
+            !parsed.town.toLowerCase().includes('local') &&
+            !parsed.address.toLowerCase().includes('local')
           ) {
             return parsed;
           }
@@ -651,7 +651,7 @@ export const locationService = {
 
       // Check if geolocation is available in browser
       if (!('geolocation' in navigator)) {
-        const ipLoc = await fetchIpLocation();
+        const ipLoc = await fetchIpLocation(false);
         return ipLoc;
       }
 
@@ -669,14 +669,45 @@ export const locationService = {
           resolve(loc);
         };
 
-        // Native Geolocation Request with High Accuracy (Precise GPS)
+        // Safety fallback timer (4.5s max): If device GPS hardware takes too long,
+        // check if browser permission is already granted. If so, fall back to IP so user is never frozen!
+        const safetyTimer = setTimeout(async () => {
+          if (isResolved) return;
+          let isGranted = false;
+          if ('permissions' in navigator) {
+            try {
+              const q = await navigator.permissions.query({ name: 'geolocation' });
+              isGranted = q.state === 'granted';
+            } catch {}
+          }
+
+          if (isGranted) {
+            if (saved && saved.lat !== 0) {
+              safeResolve({ ...saved, isLive: true, isPermissionGranted: true, timestamp: Date.now() });
+            } else {
+              const ipLoc = await fetchIpLocation(true);
+              safeResolve(ipLoc);
+            }
+          } else {
+            safeResolve({
+              ...INITIAL_UNRESOLVED_LOCATION,
+              address: 'Precise location permission required.',
+              isLive: false,
+              isPermissionGranted: false,
+            });
+          }
+        }, 4500);
+
+        // Native Geolocation Request:
+        // Stage 1: Fast Wi-Fi / Cell Positioning (<300ms)
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
+            clearTimeout(safetyTimer);
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
-            const accuracy = Math.round(pos.coords.accuracy || 15);
+            const accuracy = Math.round(pos.coords.accuracy || 20);
 
-            // Fetch fresh reverse geocode (resolves in ~300ms via BDC race)
+            // Fast Reverse Geocode (<400ms via parallel race)
             const geodata = await reverseGeocodeFull(lat, lng);
 
             const liveLoc: LocationData = {
@@ -695,27 +726,84 @@ export const locationService = {
             };
 
             safeResolve(liveLoc);
+
+            // Stage 2 (Background): High accuracy satellite refinement if initial accuracy > 30m
+            if (accuracy > 30) {
+              navigator.geolocation.getCurrentPosition(
+                async (highAccPos) => {
+                  const highLat = highAccPos.coords.latitude;
+                  const highLng = highAccPos.coords.longitude;
+                  const highAccuracy = Math.round(highAccPos.coords.accuracy || 10);
+                  const updatedLoc: LocationData = {
+                    ...liveLoc,
+                    lat: highLat,
+                    lng: highLng,
+                    accuracy: highAccuracy,
+                    timestamp: highAccPos.timestamp || Date.now(),
+                  };
+                  try {
+                    localStorage.setItem('merca_saved_location_v1', JSON.stringify(updatedLoc));
+                  } catch {}
+                },
+                () => {},
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+              );
+            }
           },
           async (err) => {
+            clearTimeout(safetyTimer);
             if (isResolved) return;
 
-            let address = 'Precise location permission required.';
+            // If user explicitly denied permission
             if (err && err.code === 1) {
-              address = 'Precise GPS permission was denied. Tap to enable.';
-            } else if (err && err.code === 2) {
-              address = 'Device location is switched off. Please turn on GPS.';
+              safeResolve({
+                ...INITIAL_UNRESOLVED_LOCATION,
+                address: 'Precise GPS permission was denied. Tap to enable.',
+                isLive: false,
+                isPermissionGranted: false,
+              });
+              return;
             }
 
-            safeResolve({
-              ...INITIAL_UNRESOLVED_LOCATION,
-              address,
-              isLive: false,
-              isPermissionGranted: false,
-            });
+            // If device location is switched off
+            if (err && err.code === 2) {
+              safeResolve({
+                ...INITIAL_UNRESOLVED_LOCATION,
+                address: 'Device location is switched off. Please turn on GPS.',
+                isLive: false,
+                isPermissionGranted: false,
+              });
+              return;
+            }
+
+            // If timeout occurred, check if permission was actually granted in browser
+            let isGranted = false;
+            if ('permissions' in navigator) {
+              try {
+                const q = await navigator.permissions.query({ name: 'geolocation' });
+                isGranted = q.state === 'granted';
+              } catch {}
+            }
+
+            if (isGranted) {
+              if (saved && saved.lat !== 0) {
+                safeResolve({ ...saved, isLive: true, isPermissionGranted: true, timestamp: Date.now() });
+              } else {
+                const ipLoc = await fetchIpLocation(true);
+                safeResolve(ipLoc);
+              }
+            } else {
+              safeResolve({
+                ...INITIAL_UNRESOLVED_LOCATION,
+                address: 'Precise location permission required.',
+                isLive: false,
+                isPermissionGranted: false,
+              });
+            }
           },
           {
-            enableHighAccuracy: true,
-            timeout: 9000,
+            enableHighAccuracy: false, // Fast immediate cellular / Wi-Fi lock
+            timeout: 3500,
             maximumAge: forceRefresh ? 0 : 15000,
           }
         );

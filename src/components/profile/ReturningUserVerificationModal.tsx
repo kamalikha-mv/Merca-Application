@@ -43,41 +43,41 @@ export const ReturningUserVerificationModal: React.FC<ReturningUserVerificationM
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn"
+      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2.5 sm:p-4 overflow-hidden animate-fadeIn"
     >
-      <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col text-left">
+      <div className="bg-white w-full max-w-md sm:max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[88dvh] text-left">
         {/* HEADER */}
-        <div className="bg-gradient-to-r from-[#0f1d32] to-[#1c3254] text-white p-5 sm:p-6 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[#0f1d32] to-[#1c3254] text-white p-3.5 sm:p-5 relative overflow-hidden shrink-0">
           <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 bg-[#e84e5f]/20 rounded-full blur-2xl pointer-events-none" />
 
           <div className="flex items-center justify-between relative z-10 mb-2">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-[#e84e5f] text-white flex items-center justify-center font-black text-lg shadow-md">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#e84e5f] text-white flex items-center justify-center font-black text-base sm:text-lg shadow-md shrink-0">
                 M
               </div>
               <div>
-                <span className="text-[10px] font-black tracking-widest text-[#e84e5f] uppercase bg-[#e84e5f]/15 px-2 py-0.5 rounded-full inline-block mb-0.5">
+                <span className="text-[9px] sm:text-[10px] font-black tracking-widest text-[#e84e5f] uppercase bg-[#e84e5f]/15 px-2 py-0.5 rounded-full inline-block mb-0.5">
                   Welcome Back
                 </span>
-                <h2 className="text-base sm:text-lg font-black text-white leading-tight">
+                <h2 className="text-sm sm:text-base font-black text-white leading-tight">
                   Emergency Profile Verification
                 </h2>
               </div>
             </div>
 
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               Armed
             </span>
           </div>
 
-          <p className="text-xs text-slate-300 leading-relaxed relative z-10">
+          <p className="text-[11px] sm:text-xs text-slate-300 leading-relaxed relative z-10">
             Please review your preconfigured emergency contacts and medical profile. You can keep your existing profile or update details anytime.
           </p>
         </div>
 
         {/* BODY */}
-        <div className="p-5 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="p-3.5 sm:p-5 space-y-3.5 overflow-y-auto flex-1 text-xs">
           {/* CURRENT OPERATIONAL GPS BASE */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2.5">
@@ -198,11 +198,11 @@ export const ReturningUserVerificationModal: React.FC<ReturningUserVerificationM
         </div>
 
         {/* FOOTER ACTIONS */}
-        <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center gap-2.5">
+        <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleKeepProfile}
-            className="w-full sm:flex-1 py-3 px-4 rounded-2xl bg-[#0f1d32] hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-98"
+            className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-[#0f1d32] hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-98"
           >
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>Confirm & Keep Current Profile</span>
@@ -211,7 +211,7 @@ export const ReturningUserVerificationModal: React.FC<ReturningUserVerificationM
           <button
             type="button"
             onClick={handleUpdateProfile}
-            className="w-full sm:w-auto py-3 px-4 rounded-2xl bg-white hover:bg-slate-100 text-[#0f1d32] border border-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-98"
+            className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-[#0f1d32] border border-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-98"
           >
             <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
             <span>Update / Edit Profile</span>
@@ -221,3 +221,4 @@ export const ReturningUserVerificationModal: React.FC<ReturningUserVerificationM
     </div>
   );
 };
+

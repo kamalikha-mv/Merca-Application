@@ -16,6 +16,8 @@ import {
   locationService,
   INITIAL_UNRESOLVED_LOCATION,
   generateLocalServices,
+  calculateDistanceKm,
+  reverseGeocodeFull,
 } from '../services/locationService';
 
 interface AppContextType {
@@ -171,9 +173,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [showToast]
   );
 
-  // Precise Browser Permission & Real-Time Device Location Sensor Watcher
+  // Precise Browser Permission & Real-Time Continuous Movement Sensor Watcher
   useEffect(() => {
     let isMounted = true;
+    let lastGeocodedLat = 0;
+    let lastGeocodedLng = 0;
 
     // 1. Browser Permission Status API
     if ('permissions' in navigator) {
@@ -207,14 +211,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       refreshLocation(false, true);
     }
 
-    // 2. Continuous Device Location Sensor Watcher (Detects if user turns off GPS in device settings)
+    // 2. Continuous Device Movement & GPS Sensor Watcher (Immediate live updates as user moves)
     let watchId: number | null = null;
     if ('geolocation' in navigator) {
       try {
         watchId = navigator.geolocation.watchPosition(
-          (pos) => {
+          async (pos) => {
             if (!isMounted) return;
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const accuracy = Math.round(pos.coords.accuracy || 15);
+
             setPermissionState('granted');
+
+            const distMovedKm =
+              lastGeocodedLat !== 0
+                ? calculateDistanceKm(lastGeocodedLat, lastGeocodedLng, lat, lng)
+                : 999;
+
+            // When user moves >150m or first GPS lock: reverse geocode locality and recalibrate emergency hubs
+            if (distMovedKm > 0.15) {
+              lastGeocodedLat = lat;
+              lastGeocodedLng = lng;
+              const geodata = await reverseGeocodeFull(lat, lng);
+              if (!isMounted) return;
+
+              const liveLoc: LocationData = {
+                lat,
+                lng,
+                address: geodata.address,
+                town: geodata.town,
+                city: geodata.city,
+                state: geodata.state,
+                country: geodata.country,
+                countryCode: geodata.countryCode,
+                accuracy,
+                timestamp: pos.timestamp || Date.now(),
+                isLive: true,
+                isPermissionGranted: true,
+              };
+
+              setLocation(liveLoc);
+              const calibrated = generateLocalServices(lat, lng, geodata.town || 'Operational Area');
+              localDb.saveServices(calibrated);
+              try {
+                localStorage.setItem('merca_saved_location_v1', JSON.stringify(liveLoc));
+              } catch {}
+            } else {
+              // Real-time smooth coordinate update for fine movement
+              setLocation((prev) => ({
+                ...prev,
+                lat,
+                lng,
+                accuracy,
+                timestamp: pos.timestamp || Date.now(),
+                isLive: true,
+                isPermissionGranted: true,
+              }));
+            }
           },
           (err) => {
             if (!isMounted) return;
@@ -223,16 +277,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               setLocation(INITIAL_UNRESOLVED_LOCATION);
             } else if (err.code === 2) {
               setPermissionState('device_disabled');
-              setLocation(INITIAL_UNRESOLVED_LOCATION);
+              // Retain last known location if previously acquired to avoid screen blanking indoors
+              setLocation((prev) => (prev.lat !== 0 ? { ...prev, isLive: false } : INITIAL_UNRESOLVED_LOCATION));
             }
           },
-          { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 }
+          { enableHighAccuracy: true, maximumAge: 4000, timeout: 12000 }
         );
       } catch {}
     }
 
+    // 3. Fast Auto-Detect Poller (Checks permission every 1.5s and immediately locks live GPS)
+    const permInterval = setInterval(async () => {
+      if (!isMounted) return;
+      if ('permissions' in navigator) {
+        try {
+          const res = await navigator.permissions.query({ name: 'geolocation' });
+          if (res.state === 'granted') {
+            setPermissionState('granted');
+            setLocation((currentLoc) => {
+              if (!currentLoc.isLive || !currentLoc.isPermissionGranted || currentLoc.lat === 0) {
+                refreshLocation(true, true);
+              }
+              return currentLoc;
+            });
+          } else {
+            setPermissionState(res.state as PrecisePermissionState);
+          }
+        } catch {}
+      }
+    }, 1500);
+
     return () => {
       isMounted = false;
+      clearInterval(permInterval);
       if (watchId !== null && 'geolocation' in navigator) {
         try {
           navigator.geolocation.clearWatch(watchId);
