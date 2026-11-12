@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   MapPin,
@@ -8,6 +8,8 @@ import {
   RefreshCw,
   CheckCircle2,
   Lock,
+  Smartphone,
+  Navigation,
 } from 'lucide-react';
 
 interface MandatoryLocationGateModalProps {
@@ -15,37 +17,23 @@ interface MandatoryLocationGateModalProps {
 }
 
 export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProps> = ({ isOpen }) => {
-  const { location, isLoadingLocation, refreshLocation, setManualLocation } = useApp();
-  const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown');
-  const [hasAttempted, setHasAttempted] = useState(false);
+  const { location, isLoadingLocation, permissionState, refreshLocation, setManualLocation } = useApp();
 
-  // Check browser permission status if supported
+  // Automatically trigger location detection on modal mount if not locked
   useEffect(() => {
-    if ('permissions' in navigator) {
-      navigator.permissions
-        .query({ name: 'geolocation' })
-        .then((result) => {
-          setPermissionState(result.state);
-          result.onchange = () => {
-            setPermissionState(result.state);
-          };
-        })
-        .catch(() => {});
-    }
-  }, []);
-
-  // Automatically trigger location detection on modal mount
-  useEffect(() => {
-    if (isOpen && (!location.isLive || !location.isPermissionGranted)) {
-      setHasAttempted(true);
+    if (isOpen && (!location.isLive || !location.isPermissionGranted || location.lat === 0)) {
       refreshLocation(false, true);
     }
-  }, [isOpen, location.isLive, location.isPermissionGranted, refreshLocation]);
+  }, [isOpen, location.isLive, location.isPermissionGranted, location.lat, refreshLocation]);
 
   if (!isOpen) return null;
 
-  // Once location is fully locked and live, automatically resolve gate
-  const isLocked = (location.isLive || location.isPermissionGranted) && location.lat !== 0;
+  // Real GPS lock requires: browser permission granted + live fix + real coordinates
+  const isLocked =
+    location.isPermissionGranted &&
+    location.isLive &&
+    location.lat !== 0 &&
+    permissionState === 'granted';
 
   return (
     <div
@@ -67,12 +55,18 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
                 Mandatory Emergency Calibration
               </span>
               <h2 className="text-lg font-black text-white leading-tight">
-                High-Precision Location Required
+                {permissionState === 'device_disabled'
+                  ? 'Device Location Switched Off'
+                  : permissionState === 'denied'
+                  ? 'Location Access Blocked'
+                  : 'Precise GPS Permission Required'}
               </h2>
             </div>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed relative z-10 mt-1">
-            Mecra is an emergency response system. Real-time GPS coordinates are required to dispatch local police, route 108 trauma ambulances, calculate towing recovery distances, and protect you during crises.
+            {permissionState === 'device_disabled'
+              ? 'Mecra cannot acquire your real-time crisis coordinates because GPS/Location is turned off in your device system settings.'
+              : 'Mecra is an emergency response system. Real-time GPS coordinates are required to dispatch local police, route 108 trauma ambulances, calculate towing recovery distances, and protect you during crises.'}
           </p>
         </div>
 
@@ -86,13 +80,21 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
                 className={`w-16 h-16 rounded-full flex items-center justify-center ${
                   isLocked
                     ? 'bg-emerald-100 text-emerald-600'
+                    : permissionState === 'device_disabled'
+                    ? 'bg-amber-100 text-amber-600 animate-pulse'
+                    : permissionState === 'denied'
+                    ? 'bg-rose-100 text-rose-600'
                     : 'bg-blue-100 text-blue-600 animate-pulse'
                 }`}
               >
                 {isLocked ? (
                   <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                ) : permissionState === 'device_disabled' ? (
+                  <Smartphone className="w-8 h-8 text-amber-600" />
+                ) : permissionState === 'denied' ? (
+                  <Lock className="w-8 h-8 text-rose-600" />
                 ) : (
-                  <MapPin className="w-8 h-8 text-blue-600" />
+                  <Navigation className="w-8 h-8 text-blue-600 animate-pulse" />
                 )}
               </div>
               {!isLocked && (
@@ -104,8 +106,12 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
               {isLocked
                 ? 'Location Locked & Verified'
                 : isLoadingLocation
-                ? 'Acquiring GPS Telemetry...'
-                : 'GPS Authorization Needed'}
+                ? 'Acquiring Precise GPS Telemetry...'
+                : permissionState === 'device_disabled'
+                ? 'Device Location is Turned Off'
+                : permissionState === 'denied'
+                ? 'Browser Location Permission Blocked'
+                : 'Precise GPS Authorization Needed'}
             </h3>
 
             <p className="text-xs text-slate-600 mt-1 max-w-xs">
@@ -114,12 +120,31 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
                   {location.address}
                 </span>
               ) : isLoadingLocation ? (
-                'Requesting coordinates from device sensors and reverse-geocoding district safe hubs...'
+                'Requesting high-accuracy coordinates from device sensors and regional emergency hubs...'
+              ) : permissionState === 'device_disabled' ? (
+                'Please switch ON Location in your device system settings, then tap Check Connection below.'
+              ) : permissionState === 'denied' ? (
+                'Please click the lock icon in your address bar, enable Location, and retry.'
               ) : (
-                'Please allow location access on your browser prompt to calibrate emergency dispatch.'
+                'Please click "Grant Precise Location" below and select "Allow" on your browser prompt.'
               )}
             </p>
           </div>
+
+          {/* DEVICE LOCATION OFF SPECIFIC GUIDANCE */}
+          {permissionState === 'device_disabled' && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-2 animate-fadeIn">
+              <div className="flex items-center gap-2 font-bold text-amber-900">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>How to turn on device location:</span>
+              </div>
+              <ul className="text-[11px] text-amber-800 space-y-1 pl-6 list-disc leading-relaxed">
+                <li><strong>Windows PC / Laptop:</strong> Press <code>Win + I</code> → Settings → Privacy & Security → Location → Toggle <strong>Location services</strong> to <strong>ON</strong>.</li>
+                <li><strong>Android Phone:</strong> Swipe down from top of screen → Tap <strong>Location</strong> icon to turn ON.</li>
+                <li><strong>iPhone / iPad:</strong> Settings → Privacy & Security → Location Services → Turn ON.</li>
+              </ul>
+            </div>
+          )}
 
           {/* PERMISSION DENIED BANNER */}
           {permissionState === 'denied' && (
@@ -129,7 +154,7 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
                 <span>Location Access is Blocked in Browser Settings</span>
               </div>
               <p className="text-[11px] text-rose-700 leading-relaxed pl-6">
-                To allow: Tap the <strong>lock icon 🔒</strong> in your browser's address bar, enable <strong>Location</strong>, and click <strong>Retry Connection</strong> below.
+                To allow: Tap the <strong>lock icon 🔒</strong> (or site settings) in your browser address bar, set <strong>Location</strong> to <strong>Allow</strong>, and click <strong>Retry Connection</strong> below.
               </p>
             </div>
           )}
@@ -167,6 +192,11 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span>Locking Live Coordinates...</span>
                 </>
+              ) : permissionState === 'device_disabled' ? (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Check Device GPS & Retry</span>
+                </>
               ) : permissionState === 'denied' ? (
                 <>
                   <RefreshCw className="w-4 h-4" />
@@ -175,25 +205,26 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>Enable Location Access</span>
+                  <span>Grant Precise Location</span>
                 </>
               )}
             </button>
 
-            {permissionState === 'denied' && (
+            {/* DEMO / SIMULATION OVERRIDE CHIPS */}
+            {(permissionState === 'denied' || permissionState === 'device_disabled') && (
               <div className="pt-2 border-t border-slate-200 text-center space-y-1.5">
                 <span className="text-[11px] font-bold text-slate-500 block">
                   Or select your operational base manually:
                 </span>
                 <div className="flex flex-wrap justify-center gap-1.5">
-                  {['Kilambakkam', 'Tambaram', 'Guindy', 'OMR / Siruseri', 'Madurai'].map((hub) => (
+                  {['Kilambakkam Corridor', 'Tambaram', 'Guindy', 'OMR / Siruseri', 'Madurai Central'].map((hub) => (
                     <button
                       key={hub}
                       type="button"
                       onClick={() => setManualLocation(hub)}
                       className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] cursor-pointer"
                     >
-                      {hub}
+                      + {hub}
                     </button>
                   ))}
                 </div>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   LocationData,
+  PrecisePermissionState,
   EmergencyCategory,
   EmergencyStatus,
   EmergencyAlertRecord,
@@ -18,9 +19,10 @@ import {
 } from '../services/locationService';
 
 interface AppContextType {
-  // Location
+  // Location & Precise Permission
   location: LocationData;
   isLoadingLocation: boolean;
+  permissionState: PrecisePermissionState;
   refreshLocation: (silent?: boolean, forceRefresh?: boolean) => Promise<void>;
   setManualLocation: (area: string) => Promise<void>;
 
@@ -75,6 +77,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved || INITIAL_UNRESOLVED_LOCATION;
   });
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [permissionState, setPermissionState] = useState<PrecisePermissionState>('checking');
 
   // Emergency State
   const [emergencyStatus, setEmergencyStatus] = useState<EmergencyStatus>('IDLE');
@@ -114,17 +117,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const loc = await locationService.getCurrentLocation({ forceRefresh, silent });
         setLocation(loc);
 
-        // Calibrate real-time emergency services with actual town & coordinates
-        if (loc.lat !== 0) {
+        if (loc.isPermissionGranted && loc.lat !== 0) {
+          setPermissionState('granted');
+          // Calibrate real-time emergency services with actual town & coordinates
           const calibrated = generateLocalServices(loc.lat, loc.lng, loc.town || 'Operational Area');
           localDb.saveServices(calibrated);
-        }
 
-        if (loc.isLive && !silent) {
-          showToast(
-            `📍 GPS locked: ${loc.town || loc.address.substring(0, 24)} (±${loc.accuracy}m)`,
-            'success'
-          );
+          if (loc.isLive && !silent) {
+            showToast(
+              `📍 GPS locked: ${loc.town || loc.address.substring(0, 24)} (±${loc.accuracy}m)`,
+              'success'
+            );
+          }
+        } else {
+          // If permission is not granted, check if denied or prompt
+          if ('permissions' in navigator) {
+            navigator.permissions
+              .query({ name: 'geolocation' })
+              .then((result) => {
+                setPermissionState(result.state as PrecisePermissionState);
+              })
+              .catch(() => {});
+          }
         }
       } catch {
         if (!silent) {
@@ -144,6 +158,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const loc = await locationService.setManualLocation(area);
         setLocation(loc);
+        setPermissionState('granted');
         if (loc.lat !== 0) {
           const calibrated = generateLocalServices(loc.lat, loc.lng, loc.town || area);
           localDb.saveServices(calibrated);
@@ -156,9 +171,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [showToast]
   );
 
-  // Initial load GPS detection
+  // Precise Browser Permission & Real-Time Device Location Sensor Watcher
   useEffect(() => {
-    refreshLocation(false, true);
+    let isMounted = true;
+
+    // 1. Browser Permission Status API
+    if ('permissions' in navigator) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then((result) => {
+          if (!isMounted) return;
+          setPermissionState(result.state as PrecisePermissionState);
+
+          result.onchange = () => {
+            if (!isMounted) return;
+            const newState = result.state as PrecisePermissionState;
+            setPermissionState(newState);
+            if (newState === 'granted') {
+              refreshLocation(false, true);
+            } else {
+              setLocation(INITIAL_UNRESOLVED_LOCATION);
+            }
+          };
+
+          if (result.state === 'granted') {
+            refreshLocation(false, true);
+          } else {
+            setIsLoadingLocation(false);
+          }
+        })
+        .catch(() => {
+          refreshLocation(false, true);
+        });
+    } else {
+      refreshLocation(false, true);
+    }
+
+    // 2. Continuous Device Location Sensor Watcher (Detects if user turns off GPS in device settings)
+    let watchId: number | null = null;
+    if ('geolocation' in navigator) {
+      try {
+        watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            if (!isMounted) return;
+            setPermissionState('granted');
+          },
+          (err) => {
+            if (!isMounted) return;
+            if (err.code === 1) {
+              setPermissionState('denied');
+              setLocation(INITIAL_UNRESOLVED_LOCATION);
+            } else if (err.code === 2) {
+              setPermissionState('device_disabled');
+              setLocation(INITIAL_UNRESOLVED_LOCATION);
+            }
+          },
+          { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 }
+        );
+      } catch {}
+    }
+
+    return () => {
+      isMounted = false;
+      if (watchId !== null && 'geolocation' in navigator) {
+        try {
+          navigator.geolocation.clearWatch(watchId);
+        } catch {}
+      }
+    };
   }, [refreshLocation]);
 
   // Periodic Background Location Tracking (Updates every 60s without re-prompting)
@@ -367,6 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         location,
         isLoadingLocation,
+        permissionState,
         refreshLocation,
         setManualLocation,
         emergencyStatus,

@@ -16,6 +16,13 @@ export type EmergencyStatus =
   | 'RESOLVED_SAFE'
   | 'CANCELLED';
 
+export type PrecisePermissionState =
+  | 'checking'
+  | 'prompt'
+  | 'granted'
+  | 'denied'
+  | 'device_disabled';
+
 export interface LocationData {
   lat: number;
   lng: number;

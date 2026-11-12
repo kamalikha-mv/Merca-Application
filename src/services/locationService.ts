@@ -86,10 +86,10 @@ export async function fetchIpLocation(): Promise<LocationData> {
           state,
           country,
           countryCode,
-          accuracy: 250,
+          accuracy: 5000,
           timestamp: Date.now(),
-          isLive: true,
-          isPermissionGranted: true,
+          isLive: false,
+          isPermissionGranted: false,
         };
         return loc;
       }
@@ -121,10 +121,10 @@ export async function fetchIpLocation(): Promise<LocationData> {
           state,
           country,
           countryCode,
-          accuracy: 350,
+          accuracy: 5000,
           timestamp: Date.now(),
-          isLive: true,
-          isPermissionGranted: true,
+          isLive: false,
+          isPermissionGranted: false,
         };
         return loc;
       }
@@ -141,10 +141,10 @@ export async function fetchIpLocation(): Promise<LocationData> {
     state: 'Tamil Nadu',
     country: 'India',
     countryCode: '+91',
-    accuracy: 50,
+    accuracy: 5000,
     timestamp: Date.now(),
-    isLive: true,
-    isPermissionGranted: true,
+    isLive: false,
+    isPermissionGranted: false,
   };
 }
 
@@ -645,16 +645,13 @@ export const locationService = {
         }
       })();
 
-      if (!forceRefresh && isOnboardingDone && saved && saved.isLive && Date.now() - (saved.timestamp || 0) < 180000) {
+      if (!forceRefresh && isOnboardingDone && saved && saved.isLive && saved.isPermissionGranted && Date.now() - (saved.timestamp || 0) < 180000) {
         return saved;
       }
 
       // Check if geolocation is available in browser
       if (!('geolocation' in navigator)) {
         const ipLoc = await fetchIpLocation();
-        try {
-          localStorage.setItem('merca_saved_location_v1', JSON.stringify(ipLoc));
-        } catch {}
         return ipLoc;
       }
 
@@ -664,26 +661,17 @@ export const locationService = {
         const safeResolve = (loc: LocationData) => {
           if (isResolved) return;
           isResolved = true;
-          try {
-            localStorage.setItem('merca_saved_location_v1', JSON.stringify(loc));
-          } catch {}
+          if (loc.isPermissionGranted && loc.lat !== 0) {
+            try {
+              localStorage.setItem('merca_saved_location_v1', JSON.stringify(loc));
+            } catch {}
+          }
           resolve(loc);
         };
 
-        // Safety fallback timer: If GPS takes >4500ms (e.g. desktop with no GPS sensor or user taking time):
-        // Automatically provide high-speed IP location so user is NEVER stuck on Step 1 or frozen!
-        const safetyTimer = setTimeout(async () => {
-          if (isResolved) return;
-          const ipLoc = await fetchIpLocation();
-          if (!isResolved) {
-            safeResolve(ipLoc);
-          }
-        }, 4500);
-
-        // Native Geolocation Request
+        // Native Geolocation Request with High Accuracy (Precise GPS)
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
-            clearTimeout(safetyTimer);
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
             const accuracy = Math.round(pos.coords.accuracy || 15);
@@ -708,17 +696,26 @@ export const locationService = {
 
             safeResolve(liveLoc);
           },
-          async () => {
-            clearTimeout(safetyTimer);
+          async (err) => {
             if (isResolved) return;
 
-            // Browser GPS failed or was denied: Immediately resolve with fast IP Geolocation (<300ms)
-            const ipLoc = await fetchIpLocation();
-            safeResolve(ipLoc);
+            let address = 'Precise location permission required.';
+            if (err && err.code === 1) {
+              address = 'Precise GPS permission was denied. Tap to enable.';
+            } else if (err && err.code === 2) {
+              address = 'Device location is switched off. Please turn on GPS.';
+            }
+
+            safeResolve({
+              ...INITIAL_UNRESOLVED_LOCATION,
+              address,
+              isLive: false,
+              isPermissionGranted: false,
+            });
           },
           {
             enableHighAccuracy: true,
-            timeout: 6000,
+            timeout: 9000,
             maximumAge: forceRefresh ? 0 : 15000,
           }
         );
