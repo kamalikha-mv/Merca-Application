@@ -21,7 +21,8 @@ interface AppContextType {
   // Location
   location: LocationData;
   isLoadingLocation: boolean;
-  refreshLocation: (silent?: boolean) => Promise<void>;
+  refreshLocation: (silent?: boolean, forceRefresh?: boolean) => Promise<void>;
+  setManualLocation: (area: string) => Promise<void>;
 
   // Emergency Management
   emergencyStatus: EmergencyStatus;
@@ -65,8 +66,11 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Location State (Restores saved location if previously granted; otherwise clean unresolved state)
+  // Location State (Restores saved location if previously granted; fresh start if onboarding incomplete)
   const [location, setLocation] = useState<LocationData>(() => {
+    if (!localDb.isOnboardingComplete()) {
+      return INITIAL_UNRESOLVED_LOCATION;
+    }
     const saved = localDb.getSavedLocation();
     return saved || INITIAL_UNRESOLVED_LOCATION;
   });
@@ -104,15 +108,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Fetch Location on demand or silently in background
   const refreshLocation = useCallback(
-    async (silent = false) => {
+    async (silent = false, forceRefresh = true) => {
       if (!silent) setIsLoadingLocation(true);
       try {
-        const loc = await locationService.getCurrentLocation(silent);
+        const loc = await locationService.getCurrentLocation({ forceRefresh, silent });
         setLocation(loc);
 
         // Calibrate real-time emergency services with actual town & coordinates
         if (loc.lat !== 0) {
-          const calibrated = generateLocalServices(loc.lat, loc.lng, loc.town || 'Kilambakkam');
+          const calibrated = generateLocalServices(loc.lat, loc.lng, loc.town || 'Operational Area');
           localDb.saveServices(calibrated);
         }
 
@@ -133,16 +137,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [showToast]
   );
 
+  // Set Manual Location override (e.g. if GPS blocked on machine or during onboarding)
+  const setManualLocation = useCallback(
+    async (area: string) => {
+      setIsLoadingLocation(true);
+      try {
+        const loc = await locationService.setManualLocation(area);
+        setLocation(loc);
+        if (loc.lat !== 0) {
+          const calibrated = generateLocalServices(loc.lat, loc.lng, loc.town || area);
+          localDb.saveServices(calibrated);
+        }
+        showToast(`📍 Location set: ${loc.town || loc.address}`, 'success');
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    },
+    [showToast]
+  );
+
   // Initial load GPS detection
   useEffect(() => {
-    refreshLocation(false);
+    refreshLocation(false, true);
   }, [refreshLocation]);
 
   // Periodic Background Location Tracking (Updates every 60s without re-prompting)
   useEffect(() => {
     const interval = setInterval(() => {
-      // Run silent background refresh
-      refreshLocation(true);
+      refreshLocation(true, false);
     }, 60000); // 60 seconds
 
     return () => clearInterval(interval);
@@ -346,6 +368,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         location,
         isLoadingLocation,
         refreshLocation,
+        setManualLocation,
         emergencyStatus,
         activeAlert,
         triggerEmergency,

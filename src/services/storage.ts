@@ -319,15 +319,17 @@ export const localDb = {
       const data = localStorage.getItem(STORAGE_KEYS.SAVED_LOCATION);
       if (!data) return null;
       const parsed = JSON.parse(data) as LocationData;
-      if (parsed) {
-        if (parsed.town === 'Local Sector' || parsed.town === 'Local Area') {
-          parsed.town = 'Kilambakkam';
-        }
-        if (parsed.address?.includes('Local Area') || parsed.address?.includes('Local Sector')) {
-          parsed.address = 'Kilambakkam, Chennai Metropolitan Area, Tamil Nadu';
-        }
+      if (
+        parsed &&
+        typeof parsed.lat === 'number' &&
+        parsed.lat !== 0 &&
+        parsed.town &&
+        !parsed.town.includes('Local Sector') &&
+        !parsed.town.includes('Local Area')
+      ) {
+        return parsed;
       }
-      return parsed;
+      return null;
     } catch {
       return null;
     }
@@ -335,20 +337,17 @@ export const localDb = {
 
   saveLocation: (loc: LocationData): void => {
     try {
-      const cleanLoc = {
-        ...loc,
-        town:
-          loc.town === 'Local Sector' || loc.town === 'Local Area'
-            ? 'Kilambakkam'
-            : loc.town,
-        address:
-          loc.address?.includes('Local Area') || loc.address?.includes('Local Sector')
-            ? 'Kilambakkam, Chennai Metropolitan Area, Tamil Nadu'
-            : loc.address,
-      };
-      localStorage.setItem(STORAGE_KEYS.SAVED_LOCATION, JSON.stringify(cleanLoc));
+      localStorage.setItem(STORAGE_KEYS.SAVED_LOCATION, JSON.stringify(loc));
     } catch (e) {
       console.warn('Storage location write error', e);
+    }
+  },
+
+  clearSavedLocation: (): void => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.SAVED_LOCATION);
+    } catch (e) {
+      console.warn('Storage location clear error', e);
     }
   },
 

@@ -25,10 +25,12 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   isOpen,
   onComplete,
 }) => {
-  const { location, refreshLocation, saveContacts, saveMedical, showToast } = useApp();
+  const { location, refreshLocation, setManualLocation, saveContacts, saveMedical, showToast } = useApp();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isDetecting, setIsDetecting] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualAreaText, setManualAreaText] = useState('');
 
   // Step 2: Empty Form Rows - User enters their own real contacts (Min 2 required)
   const [contacts, setContacts] = useState<TrustedContact[]>(() => {
@@ -62,7 +64,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
 
   // Automatically trigger location detection on mount if not yet live/granted
   React.useEffect(() => {
-    if (isOpen && step === 1 && (!location.isLive || !location.isPermissionGranted)) {
+    if (isOpen && step === 1 && (!location.isLive || !location.isPermissionGranted || location.lat === 0)) {
       handleGrantPermission();
     }
   }, [isOpen, step]);
@@ -70,13 +72,27 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   // Handle Step 1 Permission and Detection
   const handleGrantPermission = async () => {
     setIsDetecting(true);
-    await refreshLocation(false);
-    setIsDetecting(false);
+    try {
+      await refreshLocation(false, true);
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  const handleSetManual = async (area: string) => {
+    if (!area.trim()) return;
+    setIsDetecting(true);
+    try {
+      await setManualLocation(area.trim());
+    } finally {
+      setIsDetecting(false);
+      setShowManualInput(false);
+    }
   };
 
   const handleStep1Next = () => {
-    if (!location.isLive && !location.isPermissionGranted) {
-      showToast('⚠️ Precise GPS permission is mandatory to calibrate emergency response.', 'error');
+    if ((!location.isLive && !location.isPermissionGranted) || location.lat === 0) {
+      showToast('⚠️ Please detect live GPS or select your operational region below.', 'error');
       handleGrantPermission();
       return;
     }
@@ -226,12 +242,17 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                   </span>
                 </div>
                 <div className="text-sm font-black text-[#0f1d32]">
-                  {location.isLive ? (
+                  {location.isLive && location.lat !== 0 ? (
                     `${location.town || location.address.split(',')[0]}, ${location.city || 'Region'}`
+                  ) : isDetecting ? (
+                    <span className="flex items-center gap-2 text-blue-600 font-bold text-xs">
+                      <span className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                      Scanning GPS satellites & regional hubs...
+                    </span>
                   ) : (
                     <span className="flex items-center gap-2 text-slate-500 font-medium text-xs">
                       <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-                      Click "Detect Live Location" above to verify GPS coordinates
+                      Click "Detect Live Location" above or select below
                     </span>
                   )}
                 </div>
@@ -242,6 +263,62 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                     <span>State: <strong className="text-slate-800">{location.state || 'Tamil Nadu'}</strong></span>
                     <span>•</span>
                     <span>Accuracy: <strong className="text-slate-800">±{location.accuracy}m</strong></span>
+                  </div>
+                )}
+              </div>
+
+              {/* MANUAL AREA OVERRIDE / SELECTION (IF GPS DELAYED OR BLOCKED) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700">Or Select Your Region Manually:</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualInput(!showManualInput)}
+                    className="text-blue-600 hover:text-blue-800 text-[11px] font-bold underline cursor-pointer"
+                  >
+                    {showManualInput ? 'Hide Custom Input' : 'Type Custom City/Area'}
+                  </button>
+                </div>
+
+                {/* Quick Regional Hub Chips */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[
+                    'Kilambakkam Corridor',
+                    'Tambaram',
+                    'Guindy',
+                    'OMR / Siruseri',
+                    'Madurai Central',
+                    'Coimbatore',
+                  ].map((hub) => (
+                    <button
+                      type="button"
+                      key={hub}
+                      onClick={() => handleSetManual(hub)}
+                      className="px-2.5 py-1 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-900 text-[11px] font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                    >
+                      + {hub}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Input Field */}
+                {showManualInput && (
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                    <input
+                      type="text"
+                      value={manualAreaText}
+                      onChange={(e) => setManualAreaText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSetManual(manualAreaText)}
+                      placeholder="Enter area, town or district..."
+                      className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSetManual(manualAreaText)}
+                      className="px-3.5 py-1.5 rounded-xl bg-[#0f1d32] hover:bg-slate-800 text-white text-xs font-bold transition-all cursor-pointer"
+                    >
+                      Set Area
+                    </button>
                   </div>
                 )}
               </div>

@@ -15,7 +15,7 @@ interface MandatoryLocationGateModalProps {
 }
 
 export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProps> = ({ isOpen }) => {
-  const { location, isLoadingLocation, refreshLocation } = useApp();
+  const { location, isLoadingLocation, refreshLocation, setManualLocation } = useApp();
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown');
   const [hasAttempted, setHasAttempted] = useState(false);
 
@@ -38,7 +38,7 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
   useEffect(() => {
     if (isOpen && (!location.isLive || !location.isPermissionGranted)) {
       setHasAttempted(true);
-      refreshLocation(false);
+      refreshLocation(false, true);
     }
   }, [isOpen, location.isLive, location.isPermissionGranted, refreshLocation]);
 
@@ -151,10 +151,10 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
           </div>
 
           {/* ACTION BUTTON */}
-          <div>
+          <div className="space-y-3">
             <button
               type="button"
-              onClick={() => refreshLocation(false)}
+              onClick={() => refreshLocation(false, true)}
               disabled={isLoadingLocation}
               className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
                 isLoadingLocation
@@ -179,6 +179,27 @@ export const MandatoryLocationGateModal: React.FC<MandatoryLocationGateModalProp
                 </>
               )}
             </button>
+
+            {permissionState === 'denied' && (
+              <div className="pt-2 border-t border-slate-200 text-center space-y-1.5">
+                <span className="text-[11px] font-bold text-slate-500 block">
+                  Or select your operational base manually:
+                </span>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {['Kilambakkam', 'Tambaram', 'Guindy', 'OMR / Siruseri', 'Madurai'].map((hub) => (
+                    <button
+                      key={hub}
+                      type="button"
+                      onClick={() => setManualLocation(hub)}
+                      className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] cursor-pointer"
+                    >
+                      {hub}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <p className="text-[10px] text-center text-slate-400 mt-2 font-medium">
               Location is strictly used on your device for emergency response assistance.
             </p>
