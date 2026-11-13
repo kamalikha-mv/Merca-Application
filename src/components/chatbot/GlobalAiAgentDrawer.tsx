@@ -188,11 +188,11 @@ How can I help you right now?`,
 
   return (
     <>
-      {/* FLOATING ACTION BUTTON (BOTTOM-LEFT REGION AS REQUESTED) */}
+      {/* FLOATING ACTION BUTTON (BOTTOM-RIGHT REGION FOR ERGONOMIC ONE-HANDED ACCESS) */}
       <button
         onClick={() => setIsOpen(true)}
         title="Open Mecra AI Agent"
-        className={`fixed bottom-20 md:bottom-6 left-4 sm:left-6 z-40 px-3.5 py-2.5 rounded-2xl flex items-center gap-2.5 shadow-2xl transition-all cursor-pointer group hover:scale-105 active:scale-95 ${
+        className={`fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-40 px-3 sm:px-3.5 py-2.5 rounded-2xl flex items-center gap-2.5 shadow-2xl transition-all cursor-pointer group hover:scale-105 active:scale-95 ${
           isEmergencyActive
             ? 'bg-[#e84e5f] text-white border-2 border-white animate-pulse'
             : 'bg-[#0f1d32] text-white hover:bg-slate-900 border border-slate-700/80'

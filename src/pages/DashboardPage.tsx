@@ -41,6 +41,7 @@ export const DashboardPage: React.FC = () => {
   const {
     location,
     isLoadingLocation,
+    permissionState,
     refreshLocation,
     triggerEmergency,
     emergencyStatus,
@@ -106,6 +107,32 @@ export const DashboardPage: React.FC = () => {
 
       {/* ACTIVE EMERGENCY BANNER (PULSING) */}
       <LiveEmergencyBanner />
+
+      {/* DEVICE LOCATION OFF WARNING BANNER */}
+      {permissionState === 'device_disabled' && (
+        <div className="p-3.5 bg-amber-50 border-2 border-amber-300 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-950 text-xs animate-fadeIn shadow-xs">
+          <div className="flex items-start gap-2.5">
+            <div className="p-2 rounded-xl bg-amber-100 text-amber-700 shrink-0">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <div>
+              <strong className="font-extrabold text-amber-900 block text-xs">
+                Device Location (GPS) is Switched Off
+              </strong>
+              <span className="text-[11px] text-amber-800 leading-relaxed block mt-0.5">
+                Mecra cannot pinpoint your live coordinates. Please enable Location in your device system settings.
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => refreshLocation(false, true)}
+            className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all self-start sm:self-center"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingLocation ? 'animate-spin' : ''}`} />
+            <span>Turn On & Re-detect GPS</span>
+          </button>
+        </div>
+      )}
 
       {/* RESPONSIVE LAYOUT CONTAINER */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -316,20 +343,8 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* QUICK ACTION TILES GRID */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-            {/* TILE 0: TRAVEL SAFETY */}
-            <button
-              onClick={() => navigate('/travel-safety')}
-              className="p-3.5 bg-white rounded-2xl border border-[#e5ebf3] hover:border-emerald-400 shadow-xs flex flex-col items-center justify-center text-center gap-1 cursor-pointer transition-all hover:-translate-y-0.5 active:scale-95 col-span-2 sm:col-span-1"
-            >
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
-                <Compass className="w-5 h-5" />
-              </div>
-              <span className="text-xs font-black text-[#0f1d32] mt-1">Travel Safety</span>
-              <span className="text-[10px] text-emerald-700 font-semibold">Route Analytics</span>
-            </button>
-
+          {/* QUICK ACTION TILES GRID (BALANCED 4-TILE MATRIX) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
             {/* TILE 1: BREAKDOWN */}
             <button
               onClick={() => navigate('/breakdown')}
@@ -519,7 +534,7 @@ export const DashboardPage: React.FC = () => {
                 </div>
 
                 <a
-                  href={`tel:${nearestPolice.phone.split('/')[0].trim()}`}
+                  href={`tel:${nearestPolice?.phone ? nearestPolice.phone.split('/')[0].trim() : '112'}`}
                   className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 shrink-0 transition-all cursor-pointer shadow-xs"
                 >
                   <Phone className="w-3 h-3" />
@@ -546,7 +561,7 @@ export const DashboardPage: React.FC = () => {
                 </div>
 
                 <a
-                  href={`tel:${nearestHospital.phone.split('/')[0].trim()}`}
+                  href={`tel:${nearestHospital?.phone ? nearestHospital.phone.split('/')[0].trim() : '108'}`}
                   className="px-3 py-1.5 rounded-xl bg-[#e84e5f] hover:bg-[#d43d4e] text-white font-bold text-xs flex items-center gap-1 shrink-0 transition-all cursor-pointer shadow-xs"
                 >
                   <Phone className="w-3 h-3" />
@@ -573,7 +588,7 @@ export const DashboardPage: React.FC = () => {
                 </div>
 
                 <a
-                  href={`tel:${nearestPharmacy.phone.split('/')[0].trim()}`}
+                  href={`tel:${nearestPharmacy?.phone ? nearestPharmacy.phone.split('/')[0].trim() : '108'}`}
                   className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shrink-0 transition-all cursor-pointer shadow-xs"
                 >
                   <Phone className="w-3 h-3" />

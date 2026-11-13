@@ -539,7 +539,7 @@ Waiting safely on roadside shoulder. Need mechanic assistance.`;
 
                       {/* ITEM 4: VERIFIED PHONE NUMBER / CONTACT OPTION */}
                       <a
-                        href={`tel:${m.phone.split('/')[0].trim()}`}
+                        href={`tel:${m.phone ? m.phone.split('/')[0].trim() : '1033'}`}
                         onClick={(e) => e.stopPropagation()}
                         className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-xs active:scale-95"
                       >
@@ -623,7 +623,7 @@ Waiting safely on roadside shoulder. Need mechanic assistance.`;
                   </span>
                 </div>
                 <a
-                  href={`tel:${activeBreakdown.assignedMechanic.phone.split('/')[0].trim()}`}
+                  href={`tel:${activeBreakdown.assignedMechanic?.phone ? activeBreakdown.assignedMechanic.phone.split('/')[0].trim() : '1033'}`}
                   className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1 cursor-pointer shadow-xs"
                 >
                   <Phone className="w-3.5 h-3.5" />
@@ -638,7 +638,7 @@ Waiting safely on roadside shoulder. Need mechanic assistance.`;
             <button
               onClick={() => {
                 emergencyService.openWhatsApp(
-                  activeBreakdown.assignedMechanic?.phone.split('/')[0].trim() || '9840123456',
+                  activeBreakdown.assignedMechanic?.phone ? activeBreakdown.assignedMechanic.phone.split('/')[0].trim() : '9840123456',
                   `Breakdown Location: ${location.address}. Need roadside assistance for ${activeBreakdown.vehicleType}.`
                 );
               }}

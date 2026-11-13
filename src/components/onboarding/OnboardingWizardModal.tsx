@@ -180,6 +180,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   const handleFinishOnboarding = () => {
     saveMedical(medical);
     localDb.setOnboardingComplete(true);
+    sessionStorage.setItem('merca_session_profile_verified', 'true');
     showToast(
       'Mecra calibrated for your region. Real-time safety network active!',
       'success'
@@ -287,6 +288,19 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                 </div>
               </div>
 
+              {/* DEVICE LOCATION OFF GUIDANCE */}
+              {permissionState === 'device_disabled' && (
+                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-1.5 animate-fadeIn">
+                  <div className="flex items-center gap-2 font-bold text-amber-900">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Device GPS is Switched Off</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Mecra requires device GPS to lock your live coordinates. Please enable <strong>Location</strong> in your device quick settings / Windows settings and tap <strong>Detect Live Location</strong>, or select your region manually below.
+                  </p>
+                </div>
+              )}
+
               {/* DETECTED REGION HIGHLIGHT */}
               <div className="bg-white border-2 border-emerald-500/30 rounded-2xl p-3 sm:p-3.5 shadow-xs">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
@@ -309,7 +323,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                 </div>
                 <div className="text-sm font-black text-[#0f1d32]">
                   {location.isLive && location.lat !== 0 ? (
-                    `${location.town || location.address.split(',')[0]}, ${location.city || 'Region'}`
+                    `${location.town || (location.address ? location.address.split(',')[0] : 'Operational Region')}, ${location.city || 'Region'}`
                   ) : permissionState === 'granted' || isDetecting ? (
                     <span className="flex items-center gap-2 text-blue-600 font-bold text-xs">
                       <span className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />

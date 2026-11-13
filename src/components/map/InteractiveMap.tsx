@@ -93,7 +93,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       }, 200);
     }
 
+    const handleResize = () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.invalidateSize();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    const t1 = setTimeout(handleResize, 300);
+    const t2 = setTimeout(handleResize, 1000);
+
     return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(t1);
+      clearTimeout(t2);
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
         leafletMapRef.current = null;
@@ -101,10 +113,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, []);
 
-  // Recenter when location changes
+  // Recenter and invalidate size when location changes
   useEffect(() => {
     if (leafletMapRef.current && location.lat && location.lng && location.lat !== 0) {
       leafletMapRef.current.setView([location.lat, location.lng], leafletMapRef.current.getZoom());
+      leafletMapRef.current.invalidateSize();
     }
   }, [location.lat, location.lng]);
 
@@ -201,8 +214,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             <span style="color: #059669; font-weight: 700; font-size: 10px;">${svc.openHours}</span>
           </div>
           <div style="display: flex; gap: 4px; margin-top: 8px;">
-            <a href="tel:${svc.phone.split('/')[0].trim()}" style="background: ${pinColor}; color: white; text-decoration: none; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 10px; display: inline-flex; align-items: center; gap: 4px;">
-              📞 Call ${svc.phone.split('/')[0].trim()}
+            <a href="tel:${svc.phone ? svc.phone.split('/')[0].trim() : '112'}" style="background: ${pinColor}; color: white; text-decoration: none; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 10px; display: inline-flex; align-items: center; gap: 4px;">
+              📞 Call ${svc.phone ? svc.phone.split('/')[0].trim() : '112'}
             </a>
             <a href="https://www.google.com/maps/dir/?api=1&destination=${svc.lat},${
         svc.lng
@@ -347,12 +360,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
           <div className="flex items-center gap-2 shrink-0">
             <a
-              href={`tel:${selectedService.phone.split('/')[0].trim()}`}
+              href={`tel:${selectedService.phone ? selectedService.phone.split('/')[0].trim() : '112'}`}
               onClick={() => emergencyService.callNumber(selectedService.phone)}
               className="px-4 py-2 rounded-xl bg-[#e84e5f] hover:bg-[#d43d4e] text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
             >
               <Phone className="w-3.5 h-3.5" />
-              <span>Call {selectedService.phone.split('/')[0].trim()}</span>
+              <span>Call {selectedService.phone ? selectedService.phone.split('/')[0].trim() : 'Emergency'}</span>
             </a>
             <a
               href={locationService.getGoogleMapsDirectionsUrl(

@@ -44,7 +44,7 @@ export const AgenticChatbot: React.FC = () => {
       id: 'init-1',
       sender: 'agent',
       text: `Hello! I am your **Mecra Safety Assistant**.
-I am actively connected to your GPS (${location.isLive ? (location.town || location.address.split(',')[0]) : 'Live GPS'}), Medical ID, and Emergency Contacts.
+I am actively connected to your GPS (${location.isLive ? (location.town || (location.address ? location.address.split(',')[0] : 'Live GPS')) : 'Live GPS'}), Medical ID, and Emergency Contacts.
 
 You can instruct me naturally:
 • *"Update my blood group to B+"*

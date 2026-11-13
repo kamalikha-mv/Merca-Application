@@ -89,7 +89,7 @@ export const ReturningUserVerificationModal: React.FC<ReturningUserVerificationM
                   Active Crisis Calibration Hub
                 </span>
                 <strong className="text-xs font-black text-[#0f1d32] block">
-                  {location.town || location.address.split(',')[0] || 'Kilambakkam Corridor'}
+                  {location.town || (location.address ? location.address.split(',')[0] : 'Kilambakkam Corridor')}
                 </strong>
                 <span className="text-[11px] text-slate-600 block">
                   {location.city || 'Chennai Metropolitan Area'} • {location.state || 'Tamil Nadu'}

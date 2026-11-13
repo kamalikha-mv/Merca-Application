@@ -802,9 +802,9 @@ export const locationService = {
             }
           },
           {
-            enableHighAccuracy: false, // Fast immediate cellular / Wi-Fi lock
-            timeout: 3500,
-            maximumAge: forceRefresh ? 0 : 15000,
+            enableHighAccuracy: true, // Invokes OS Play Services device location prompt on Android/iOS
+            timeout: forceRefresh ? 6000 : 4000,
+            maximumAge: forceRefresh ? 0 : 10000,
           }
         );
       });
